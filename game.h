@@ -1,6 +1,7 @@
 #include <vector>
 #include <utility>
 #include <random>
+#include <memory>
 #include <algorithm>
 
 std::random_device rd;
@@ -26,6 +27,11 @@ class Deck{
             }
         }
     }
+    card Drawcard(){
+        card temp=deck.back();
+        deck.pop_back();
+        return temp;
+    }
     void shuffer(){
         std::shuffle(deck.begin(), deck.end(), tt);
     }
@@ -35,17 +41,65 @@ class Deck{
 
 class GamePlayer{
     public:
-    void DarwCard(card &d){
+    void DarwCard(const card &d){
         hand.push_back(d);
         std::sort(hand.begin(),hand.end());
     }
-    void PlayCard(card &d){
-        
+    bool PlayCard(const std::vector<card>& play){
+        for(const card &now : play){
+            for(auto it = hand.begin(); it != hand.end(); ++it){
+                if(now == *it){
+                    hand.erase(it);
+                    break;  
+                }
+            }
+        }
+
+        if(hand.empty()) return 1;
+        return 0;
     }
     private:
     int id;
     std::vector<card> hand;
 };
 
+class Game{
+    public:
+        std::shared_ptr<GamePlayer> AddPlayer(){
+            auto newplayer = std::make_shared<GamePlayer>();
+            players.push_back(*newplayer);
+            return newplayer;
+        }
 
+        bool gamestart(){
+            if(players.size()!=4)return 0;
+            deck.shuffer();status=1;
+            for(int j=0;j<13;++j)
+            for(int i=0;i<4;++i){
+                players[i].DarwCard(deck.Drawcard());
+            }
+            return 1;
+        }
+
+        int rount(const std::vector<card>& play){// 0:error 1:continue 2:win
+            if(!check(play))return 0;
+            //card_in_table=
+            if(players[nowplayer].PlayCard(play))return 2;
+            nowplayer++;
+            nowplayer%=4;
+            return 1;
+        }
+
+        bool check(const std::vector<card>& play){
+            //...
+            return 1;
+        }
+    public:
+        std::vector<GamePlayer> players;
+        bool status=0;
+        int nowplayer=tt()%4;
+        //??? card_in_table
+    private:
+        Deck deck;
+};
 
