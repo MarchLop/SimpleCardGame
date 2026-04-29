@@ -152,8 +152,12 @@ class Game{
         }
 
         bool check(const std::vector<Card>& play){
-            //...
-            return 1;
+            CardsType temp=tell_type(play);
+            if(temp==CardsType::INVALID)return 0;
+            if(card_in_table.first==CardsType::INVALID) return 1;
+            if(temp!=card_in_table.first)return 0;
+            if(card_in_table.second[0]<play[0])return 1;
+            return 0;
         }
 
         void table_clear(){
