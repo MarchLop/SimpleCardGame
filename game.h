@@ -1,4 +1,5 @@
 #pragma once
+
 #include <vector>
 #include <utility>
 #include <random>
@@ -10,14 +11,71 @@ std::mt19937 tt(rd());
 class Card{
     public:
     Card(int n,int s):num(n),suit(s){}
-    int num,suit;// spade=3,heart=2;diamond=1;clove=0
     bool operator<(const Card & other)const{
-        return (suit==other.suit)? num<other.num : suit<other.suit;
+        return (num==other.num)?suit<other.suit:num<other.num ;
     }
     bool operator==(const Card &other)const{
         return (num==other.num)&&(suit==other.suit);
     }
+    public:
+    int num,suit;// spade=3,heart=2;diamond=1;clove=0
 };
+
+enum class CardsType{
+    INVALID,
+    SINGLE,       // 单张 A
+    PAIR,         // 对子 AA
+    THREE,        // 三条 AAA
+    THREE_TWO,    // 三带二 AAABB
+    STRAIGHT,     // 顺子(5张起) ABCDE...
+    FOUR,         // 炸弹(4张) AAAA
+    FOUR_TWO,     // 四带二 AAAABB
+};
+
+CardsType tell_type(const std::vector<Card>& play){
+    bool f=1;//is_straight
+    int now=1;
+    for(auto i=play.begin()+1;i!=play.end();i++){
+        if(i->num!=play.begin()->num+now){
+            f=0;break;
+        }
+        now++;
+    }
+    if(f)return CardsType::STRAIGHT;
+    switch(play.size()){
+        case 1:{return CardsType::SINGLE;}
+        case 2:{
+            if(play[0].num!=play[1].num)return CardsType::INVALID;
+            return CardsType::PAIR;
+        }
+        case 3:{
+            if(play[0].num!=play[1].num||play[2].num!=play[1].num)return CardsType::INVALID;
+            return CardsType::THREE;
+        }
+        case 4:{
+            for(const Card& temp:play){
+                if(temp.num!=play.begin()->num)return CardsType::INVALID;
+            }
+            return CardsType::FOUR;
+        }
+        case 5:{
+            if(play[1].num!=play[0].num||
+                play[3].num!=play[4].num||
+                (play[2].num!=play[3].num&&play[1].num!=play[3].num))return CardsType::INVALID;
+            return CardsType::THREE_TWO; 
+        }
+        case 6:{
+            if(play[1].num!=play[0].num||
+                play[5].num!=play[4].num||
+                play[2].num!=play[3].num||
+                (play[2].num!=play[1].num&&play[4].num!=play[3].num))return CardsType::INVALID;
+            return CardsType::FOUR_TWO;    
+        }
+        default :{
+            return CardsType::INVALID;
+        }
+    }
+}
 
 class Deck{
     public:
@@ -79,12 +137,14 @@ class Game{
             for(int i=0;i<4;++i){
                 players[i]->DarwCard(deck.Drawcard());
             }
+            turn=0;
+            table_clear();
             return 1;
         }
 
-        int round(const std::vector<Card>& play){// 0:error 1:continue 2:win
+        int round(const std::vector<Card>& play){// 0:error 1:continue 2:win 确保牌按格式传进来
             if(!check(play))return 0;
-            //card_in_table=
+            card_in_table={tell_type(play),play};
             if(players[nowplayer]->PlayCard(play))return 2;
             nowplayer++;
             nowplayer%=4;
@@ -95,11 +155,17 @@ class Game{
             //...
             return 1;
         }
+
+        void table_clear(){
+            card_in_table.first=CardsType::INVALID;
+            turn++;
+        }
     public:
         std::vector<std::shared_ptr<GamePlayer>> players;
         bool status=0;
         int nowplayer=tt()%4;
-        //??? card_in_table
+        int turn=0;
+        std::pair<CardsType,std::vector<Card>> card_in_table;
     private:
         Deck deck;
 };
