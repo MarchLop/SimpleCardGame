@@ -87,8 +87,8 @@ CardsType tell_type(const std::vector<Card>& play){
 class Deck{
     public:
     Deck(){
-        for(int i=Card::THREE;i<=Card::EIGHT;i++){
-            for(int j=0;j<=3;j++){
+        for(int i=Card::THREE;i<=Card::TWO;i++){
+            for(int j=Card::CLOVE;j<=Card::SPADE;j++){
                 deck.push_back((Card){i,j});
             }
         }
