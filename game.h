@@ -98,7 +98,7 @@ class Deck{
         deck.pop_back();
         return temp;
     }
-    void shuffer(){
+    void shuffle(){
         std::shuffle(deck.begin(), deck.end(), tt);
     }
     private:
@@ -107,7 +107,7 @@ class Deck{
 
 class GamePlayer{
     public:
-    void DarwCard(const Card &d){
+    void DrawCard(const Card &d){
         hand.push_back(d);
         if(d.num==Card::TWO&&d.suit==Card::HERAT)identity=1;
         if(d.num==Card::KING&&d.suit==Card::SPADE)identity=1;
@@ -146,10 +146,10 @@ class Game{// note who host outside
 
         bool gamestart(){
             if(players.size()!=4)return 0;
-            deck.shuffer();status=1;
+            deck.shuffle();status=1;
             for(int j=0;j<13;++j)
             for(int i=0;i<4;++i){
-                players[i]->DarwCard(deck.Drawcard());
+                players[i]->DrawCard(deck.Drawcard());
             }
             turn=0;
             table_clear();
@@ -167,14 +167,14 @@ class Game{// note who host outside
                 do{
                 nowplayer++;
                 nowplayer%=4;
-                }while(!players[nowplayer]->over);
+                }while(players[nowplayer]->over);
                 return 2;
             }
             card_in_table={tell_type(play),play};
             do{
                 nowplayer++;
                 nowplayer%=4;
-            }while(!players[nowplayer]->over);
+            }while(players[nowplayer]->over);
             return 1;
         }
 
