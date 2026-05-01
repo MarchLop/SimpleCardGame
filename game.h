@@ -107,8 +107,9 @@ class Deck{
 
 class GamePlayer{
     public:
-    void DrawCard(const Card &d){
+    void DrawCard(const Card &d,int &now,int &i){
         hand.push_back(d);
+        if(d.num==Card::THREE&&d.suit==Card::CLOVE)now=i;
         if(d.num==Card::TWO&&d.suit==Card::HERAT)identity=1;
         if(d.num==Card::KING&&d.suit==Card::SPADE)identity=1;
         std::sort(hand.begin(),hand.end());
@@ -149,7 +150,7 @@ class Game{// note who host outside
             deck.shuffle();status=1;
             for(int j=0;j<13;++j)
             for(int i=0;i<4;++i){
-                players[i]->DrawCard(deck.Drawcard());
+                players[i]->DrawCard(deck.Drawcard(),nowplayer,i);
             }
             turn=0;
             table_clear();
