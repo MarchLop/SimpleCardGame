@@ -25,9 +25,10 @@ struct Player{
 };
 
 struct Room {
+    Room(int i):id(i){game.AddPlayer();}
     int id;
     Game game;
-    std::vector<Player> players;
+    std::vector<Player*> players;
 };
 
 server ws_server;
@@ -36,14 +37,15 @@ std::string cha="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 std::vector<Room> rooms;
 std::unordered_map<std::string,Player> auth_players;
-std::map<connection_hdl,Player*> hdl_to_players;
+std::map<connection_hdl,Player*, std::owner_less<connection_hdl>> hdl_to_players;
 int next_player_id = 1;
 int next_room_id = 1;
 
 std::string romdom_token(){
     std::string s;
+    std::uniform_int_distribution<int> dist(0, (int)cha.size() - 1);
     for(int i=0;i<48;i++){
-        s+=cha[tt()%62];
+        s += cha[dist(tt)];
     }
     return s;
 } 
@@ -51,7 +53,7 @@ std::string romdom_token(){
 // 广播给房间所有人
 void broadcast(Room& room, const std::string& msg) {
     for (auto& p : room.players) {
-        ws_server.send(p.hdl, msg, websocketpp::frame::opcode::text);
+        ws_server.send(p->hdl, msg, websocketpp::frame::opcode::text);
     }
 }
 
@@ -66,50 +68,112 @@ void broadcast(Room& room, const std::string& msg) {
 // }
 
 // 收到消息
-std::unordered_map<std::string,int> ty={{"auth",0},{"change_name",1}}; 
+std::unordered_map<std::string,int> ty={{"auth",0},{"change_name",1},{"create_room",2}}; 
 
 void on_message(connection_hdl hdl, server::message_ptr msg) {
     json j=json::parse(msg->get_payload());
     if(!j.contains("type"))return;
     std::string type=j.at("type").get<std::string>();
-    switch(ty[type]){
+    auto it_type=ty.find(type);
+    if(it_type==ty.end()){
+
+        return;
+    }
+    switch(it_type->second){
         case 0:{
-            if(!j.contains("token")||j["token"]==""){
-                std::string token=romdom_token();
+            std::string token = j.value("token", std::string());
+            if(token.empty()){
+                token = romdom_token();
                 auto [it, inserted] = auth_players.emplace(token, Player{hdl, token});
-                if (inserted) {
+                hdl_to_players[hdl] = &it->second;
+                json resp;
+                resp["type"] = "auth_ok";
+                resp["token"] = token;
+                ws_server.send(hdl, resp.dump(), websocketpp::frame::opcode::text);
+            } else {
+                auto it = auth_players.find(token);
+                if(it != auth_players.end()){
+                    it->second.hdl = hdl;
                     hdl_to_players[hdl] = &it->second;
+                    json msgs;
+                    msgs["name"] = it->second.name;
+                    msgs["type"] = "player_name";
+                    msgs["token"] = token;
+                    ws_server.send(hdl, msgs.dump(), websocketpp::frame::opcode::text);
+                } else {
+                    auto [it2, inserted] = auth_players.emplace(token, Player{hdl, token});
+                    hdl_to_players[hdl] = &it2->second;
+                    json msgs;
+                    msgs["name"] = it2->second.name;
+                    msgs["type"] = "player_name";
+                    msgs["token"] = token;
+                    ws_server.send(hdl, msgs.dump(), websocketpp::frame::opcode::text);
                 }
-            }
-            else{
-                auto it =auth_players.find(j["token"]);
-                if (it!=auth_players.end()){
-                    it->second.hdl=hdl;
-                    hdl_to_players[hdl] = &it->second;
-                }
-                else{
-                    auto [it, inserted] = auth_players.emplace(j["token"], Player{hdl, j["token"]});
-                    if (inserted) {
-                    hdl_to_players[hdl] = &it->second;
-                    }
-                }
-                json msgs;
-                msgs["name"]=auth_players[j["token"]].name;
-                msgs["type"]="player_name";
-                ws_server.send(hdl, msgs.dump(), websocketpp::frame::opcode::text);
             }
             break;
         }
         case 1:{
-            hdl_to_players[hdl]->name=j["name"];
+            {
+            auto itp = hdl_to_players.find(hdl);
+            if(itp == hdl_to_players.end()){
+                json err{{"type","error"},{"msg","not_authed"}};
+                ws_server.send(hdl, err.dump(), websocketpp::frame::opcode::text);
+                break;
+            }
+            itp->second->name = j.value("name", std::string("NONE"));
+            }
             break;
         }
+        case 2:{
+            {
+            auto itp = hdl_to_players.find(hdl);
+            json msgt;
+            if(itp == hdl_to_players.end()){
+                msgt["type"] = "room_created";
+                msgt["res"] = "failed";
+                msgt["reason"] = "not_authed";
+                ws_server.send(hdl, msgt.dump(), websocketpp::frame::opcode::text);
+                break;
+            }
+            if(rooms.size() >= 10){
+                msgt["type"] = "room_created";
+                msgt["res"] = "failed";
+                msgt["reason"] = "max_rooms";
+                ws_server.send(hdl, msgt.dump(), websocketpp::frame::opcode::text);
+                break;
+            }
+            rooms.emplace_back(next_room_id);
+            rooms.back().players.push_back(itp->second);
+            msgt["type"] = "room_created";
+            msgt["room_id"] = next_room_id;
+            msgt["player_id"] = 1;
+            msgt["res"] = "success";
+            ws_server.send(hdl, msgt.dump(), websocketpp::frame::opcode::text);
+            next_room_id++;
+            }
+        }
+
     }
 }
 
 // 断开连接
 void on_close(connection_hdl hdl) {
-    
+    auto it = hdl_to_players.find(hdl);
+    if(it != hdl_to_players.end()){
+        Player* p = it->second;
+        // 从所有房间移除该玩家指针
+        for(auto &room : rooms){
+            room.players.erase(std::remove(room.players.begin(), room.players.end(), p), room.players.end());
+        }
+        // 重置 auth_players 中对应玩家的 hdl（保留 token）
+        for(auto &kv : auth_players){
+            if(&kv.second == p){
+                kv.second.hdl = connection_hdl();
+                break;
+            }
+        }
+        hdl_to_players.erase(it);
+    }
 }
 
 int main() {

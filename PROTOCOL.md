@@ -70,8 +70,7 @@
 **服务端 → 客户端**（广播给同房间玩家）
 ```json
 {
-    "type": "player_name",
-    "player_id": 1,
+    "type": "name",
     "name": "亮神"
 }
 ```

@@ -5,9 +5,10 @@
 #include <random>
 #include <memory>
 #include <algorithm>
+#include <set>
 
-std::random_device rd;
-std::mt19937 tt(rd()); 
+inline std::random_device rd;
+inline std::mt19937 tt(rd()); 
 class Card{
     public:
     Card(int n,int s):num(n),suit(s){}
@@ -39,17 +40,19 @@ enum class CardsType{
 };
 
 CardsType tell_type(const std::vector<Card>& play){
-    bool f=1;//is_straight
-    int now=1;
-    if(play.rbegin()->num==Card::TWO)f=0;
-    for(auto i=play.begin()+1;i!=play.end();i++){
-        if(i->num!=play.begin()->num+now){
-            f=0;break;
+    if(play.empty()) return CardsType::INVALID;
+    size_t n = play.size();
+    // 检查顺子（需要至少5张，且不能包含2，且点数严格连续且无重复点数）
+    if(n >= 5){
+        bool is_straight = true;
+        if(play.back().num == Card::TWO) is_straight = false;
+        for(size_t i = 1; i < n; ++i){
+            if(play[i].num == play[i-1].num){ is_straight = false; break; } // 重复点
+            if(play[i].num != play[0].num + int(i)) { is_straight = false; break; }
         }
-        now++;
+        if(is_straight) return CardsType::STRAIGHT;
     }
-    if(f)return CardsType::STRAIGHT;
-    switch(play.size()){
+    switch(n){
         case 1:{return CardsType::SINGLE;}
         case 2:{
             if(play[0].num!=play[1].num)return CardsType::INVALID;
@@ -94,6 +97,7 @@ class Deck{
         }
     }
     Card Drawcard(){
+        if(deck.empty()) throw std::runtime_error("Deck is empty");
         Card temp=deck.back();
         deck.pop_back();
         return temp;
@@ -115,20 +119,24 @@ class GamePlayer{
         std::sort(hand.begin(),hand.end());
     }
     bool PlayCard(const std::vector<Card>& play){
-        for(const Card &now : play){
-            for(auto it = hand.begin(); it != hand.end(); ++it){
-                if(now == *it){
-                    hand.erase(it);
-                    break;  
-                }
-            }
+        // 先验证所有牌都在手牌中
+        std::multiset<Card> tmp(hand.begin(), hand.end());
+        for(const Card &c : play){
+            auto it = tmp.find(c);
+            if(it == tmp.end()) return false; // 非法出牌
+            tmp.erase(it);
+        }
+        // 验证通过，真正从 hand 中移除
+        for(const Card &c : play){
+            auto it = std::find(hand.begin(), hand.end(), c);
+            if(it != hand.end()) hand.erase(it);
         }
 
         if(hand.empty()){
-            over=1;
-            return 1;
+            over = 1;
+            return true;
         }
-        return 0;
+        return false;
     }
     bool over=0;
     private:
@@ -157,7 +165,7 @@ class Game{// note who host outside
             return 1;
         }
 
-        int round(const std::vector<Card>& play){// 0:error 1:continue 2:player_over 3game_over确保牌按格式传进来
+        int round(const std::vector<Card>& play){// 0:error 1:continue 2:player_over 确保牌按格式传进来
             if(!check(play))return 0;
             
             if(players[nowplayer]->PlayCard(play)){
@@ -180,12 +188,40 @@ class Game{// note who host outside
         }
 
         bool check(const std::vector<Card>& play){
-            CardsType temp=tell_type(play);
-            if(temp==CardsType::INVALID)return 0;
-            if(card_in_table.first==CardsType::INVALID) return 1;
-            if(temp!=card_in_table.first)return 0;
-            if(card_in_table.second[0]<play[0])return 1;
-            return 0;
+            CardsType temp = tell_type(play);
+            if(temp == CardsType::INVALID) return false;
+            if(card_in_table.first == CardsType::INVALID) return true;
+            if(temp != card_in_table.first) return false;
+
+            auto min_suit = [](const std::vector<Card>& cards){
+                Card m = cards[0];
+                for(size_t i = 1; i < cards.size(); ++i){
+                    if(cards[i]<m) m = cards[i];
+                }
+                return m;
+            };
+
+            switch(temp){
+                case CardsType::SINGLE:
+                    if(play[0].num > card_in_table.second[0].num) return true;
+                    if(play[0].num == card_in_table.second[0].num && play[0].suit > card_in_table.second[0].suit) return true;
+                    return false;
+                case CardsType::PAIR: {
+                    if(play[0].num != card_in_table.second[0].num) return play[0].num > card_in_table.second[0].num;
+                    return  min_suit(card_in_table.second) < min_suit(play);
+                }
+                case CardsType::THREE:
+                case CardsType::FOUR:
+                case CardsType::THREE_TWO:
+                case CardsType::FOUR_TWO:
+                    return play[0].num > card_in_table.second[0].num;
+                case CardsType::STRAIGHT: {
+                    if(play.back().num != card_in_table.second.back().num) return play.back().num > card_in_table.second.back().num;
+                    return min_suit(card_in_table.second) < min_suit(play);
+                }
+                default:
+                    return false;
+            }
         }
 
         void table_clear(){//when host==nowplayer
