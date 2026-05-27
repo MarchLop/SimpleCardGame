@@ -5,77 +5,88 @@
 - 通信方式：WebSocket
 - 地址：`ws://localhost:9002`
 - 数据格式：JSON（UTF-8 编码）
+- 所有消息必须包含 `type` 字段。
+- 只通过 WebSocket 发送，无 HTTP 请求。
 
 ---
 
-## 一、连接与认证
+## 一、认证与会话
 
-### 流程
+### 1. 认证流程
 
 ```
-客户端                            服务端
-  │                                │
-  ├── WebSocket 连接 ──────────────→│
-  │                                │
-  ├── { type: "auth" } ───────────→│
-  │                                ├── 生成新 token
-  │←─ { type: "auth_ok",           │
-  │      token: "xxx",             │
-  │      player_id: 1 }            │
-  │                                │
-  │          （后续操作）           │
-  │                                │
-  ├── { type: "auth",              │  ← 断线重连时
-  │      token: "xxx" } ──────────→│
-  │←─ { type: "auth_ok",           │
-  │      player_id: 1 }            │
+客户端                         服务端
+  │                              │
+  ├── WebSocket 连接 ───────────→│
+  │                              │
+  ├── { type: "auth" } ───────→│
+  │                              │
+  │←─ { type: "auth_ok",       │
+  │      token: "xxx" }        │
+  │                              │
+  │   断线后重连时继续使用 token   │
+  │                              │
+  ├── { type: "auth",         │
+  │      token: "xxx" } ───────→│
+  │                              │
+  │←─ { type: "auth_ok",       │
+  │      token: "xxx" }        │
 ```
 
-### 客户端 → 服务端
+### 2. 客户端 → 服务端
 
-**连接认证（首次）**
+**首次认证**
 ```json
 { "type": "auth" }
 ```
 
-**连接认证（重连）**
+**断线重连认证**
 ```json
 { "type": "auth", "token": "a3f9k2m1x7p4q8w0" }
 ```
 
-### 服务端 → 客户端
+### 3. 服务端 → 客户端
 
 **认证成功**
 ```json
 {
-    "type": "auth_ok",
-    "token": "a3f9k2m1x7p4q8w0",
-    "player_id": 1
+  "type": "auth_ok",
+  "token": "a3f9k2m1x7p4q8w0"
 }
 ```
 
-`token` 和 `player_id` 由客户端保存（localStorage），重连时使用。
+**认证失败**
+```json
+{
+  "type": "error",
+  "code": 1007,
+  "message": "token 无效"
+}
+```
+
+> 建议客户端将 `token` 存储到 `localStorage` 或本地持久化，后续重连时再次发送。
 
 ---
 
-## 二、玩家与房间管理
+## 二、房间与玩家管理
 
-### 修改昵称
+### 1. 修改昵称
 
 **客户端 → 服务端**
 ```json
-{ "type": "change_name", "name": "亮神" }
+{ "type": "change_name", "name": "NONE" }
 ```
 
-**服务端 → 客户端**（广播给同房间玩家）
+**服务端 → 房间广播**
 ```json
 {
-    "type": "name",
-    "name": "亮神"
+  "type": "player_name_changed",
+  "player_id": 1,
+  "name": "NONE"
 }
 ```
 
-### 创建房间
+### 2. 创建房间
 
 **客户端 → 服务端**
 ```json
@@ -85,57 +96,60 @@
 **服务端 → 客户端**
 ```json
 {
-    "type": "room_created",
-    "room_id": 1,
-    "player_id": 1
+  "type": "room_created",
+  "room_id": 1,
+  "max_players": 4,
+  "started": false
 }
 ```
 
-### 加入房间
+### 3. 加入房间
 
 **客户端 → 服务端**
 ```json
 { "type": "join_room", "room_id": 1 }
 ```
 
-**服务端 → 客户端**（自己）
+**服务端 → 加入者**
 ```json
 {
-    "type": "room_joined",
-    "room_id": 1,
-    "player_id": 2
+  "type": "room_joined",
+  "room_id": 1,
+  "player_count": 2,
+  "max_players": 4,
+  "started": false
 }
 ```
 
-**服务端 → 客户端**（广播给房间其他人）
+**服务端 → 房间内广播**
 ```json
 {
-    "type": "player_joined",
-    "player_id": 2,
-    "player_name": "智宝",
-    "room_id": 1,
-    "player_count": 2
+  "type": "player_joined",
+  "player_id": 2,
+  "player_name": "NONE",
+  "room_id": 1,
+  "player_count": 2
 }
 ```
 
-### 退出房间
+### 4. 退出房间
 
 **客户端 → 服务端**
 ```json
 { "type": "leave_room" }
 ```
 
-**服务端 → 客户端**（广播）
+**服务端 → 房间广播**
 ```json
 {
-    "type": "player_left",
-    "player_id": 2,
-    "room_id": 1,
-    "player_count": 1
+  "type": "player_left",
+  "player_id": 2,
+  "room_id": 1,
+  "player_count": 1
 }
 ```
 
-### 获取房间列表
+### 5. 获取房间列表
 
 **客户端 → 服务端**
 ```json
@@ -145,168 +159,188 @@
 **服务端 → 客户端**
 ```json
 {
-    "type": "room_list",
-    "rooms": [
-        { "room_id": 1, "player_count": 2, "max_players": 4, "started": false },
-        { "room_id": 2, "player_count": 4, "max_players": 4, "started": true }
-    ]
+  "type": "room_list",
+  "rooms": [
+    {
+      "room_id": 1,
+      "player_count": 2,
+      "max_players": 4,
+      "started": false
+    },
+    {
+      "room_id": 2,
+      "player_count": 4,
+      "max_players": 4,
+      "started": true
+    }
+  ]
 }
 ```
 
 ---
 
-## 三、游戏流程
+## 三、游戏阶段
 
-### 准备
+### 1. 准备
 
 **客户端 → 服务端**
 ```json
 { "type": "ready" }
 ```
 
-**服务端 → 客户端**（广播）
+**服务端 → 房间广播**
 ```json
 {
-    "type": "player_ready",
-    "player_id": 1,
-    "room_id": 1,
-    "ready_count": 1
+  "type": "player_ready",
+  "player_id": 1,
+  "room_id": 1,
+  "ready_count": 2,
+  "player_count": 4
 }
 ```
 
-### 游戏开始（4 人全部 ready 后自动触发）
+### 2. 游戏开始
 
-**服务端 → 客户端**（单独发给每个玩家，只包含自己的手牌）
+所有房间玩家 `ready` 后自动开始游戏。
+
+**服务端 → 每个玩家**
 ```json
 {
-    "type": "game_start",
-    "room_id": 1,
-    "hand": [
-        { "num": 3, "suit": 0 },
-        { "num": 7, "suit": 2 },
-        ...
-    ],
-    "first_turn": 0
+  "type": "game_start",
+  "room_id": 1,
+  "hand": [
+    { "num": 3, "suit": 0 },
+    { "num": 7, "suit": 2 },
+    ...
+  ],
+  "first_turn": 0
 }
 ```
 
-### 轮到某玩家
+> `hand` 仅包含接收该消息玩家自己的手牌。
 
-**服务端 → 客户端**
+### 3. 当前玩家回合
+
+**服务端 → 当前玩家**
 ```json
 {
-    "type": "your_turn",
-    "player_id": 0,
-    "last_play": [
-        { "num": 8, "suit": 1 },
-        { "num": 8, "suit": 2 }
-    ],
-    "last_player": 3,
-    "is_free": false
+  "type": "your_turn",
+  "room_id": 1,
+  "player_id": 0,
+  "last_play": [
+    { "num": 8, "suit": 1 },
+    { "num": 8, "suit": 2 }
+  ],
+  "last_player": 3,
+  "is_free": false
 }
 ```
 
-参数说明：
-- `last_play`：上一次出的牌（空数组表示牌桌已清）
-- `last_player`：上一次出牌的玩家 id
-- `is_free`：true 表示可以自由出牌（其他三人均已 pass）
+字段含义：
+- `last_play`：上一次出牌，若桌面已清则为 `[]`。
+- `last_player`：上一次出牌玩家的 `player_id`。
+- `is_free`：若为 `true`，表示本回合可以随意出牌，不需要压制之前的牌。
 
-### 出牌
+### 4. 出牌
 
 **客户端 → 服务端**
 ```json
 {
-    "type": "play",
-    "cards": [
-        { "num": 10, "suit": 0 },
-        { "num": 10, "suit": 1 },
-        { "num": 10, "suit": 2 }
-    ]
-}
+  "type": "play",
+  "cards": [
+    { "num": 10, "suit": 0 },
+    { "num": 10, "suit": 1 },
+    { "num": 10, "suit": 2 }
+  ]
 ```
 
-**服务端 → 客户端**（广播，出牌成功）
+**服务端 → 房间广播（成功）**
 ```json
 {
-    "type": "play_result",
-    "player_id": 0,
-    "cards": [
-        { "num": 10, "suit": 0 },
-        { "num": 10, "suit": 1 },
-        { "num": 10, "suit": 2 }
-    ],
-    "cards_left": 10,
-    "next_turn": 1
+  "type": "play_result",
+  "room_id": 1,
+  "player_id": 0,
+  "cards": [
+    { "num": 10, "suit": 0 },
+    { "num": 10, "suit": 1 },
+    { "num": 10, "suit": 2 }
+  ],
+  "cards_left": 10,
+  "next_turn": 1
 }
 ```
 
-**服务端 → 客户端**（出牌无效）
+**服务端 → 出牌者（失败）**
 ```json
 {
-    "type": "play_invalid",
-    "reason": "牌型不合法"
+  "type": "play_invalid",
+  "code": 1004,
+  "message": "牌型不合法"
 }
 ```
 
-### 不出牌
+### 5. 不出
 
 **客户端 → 服务端**
 ```json
 { "type": "pass" }
 ```
 
-**服务端 → 客户端**（广播）
+**服务端 → 房间广播**
 ```json
 {
-    "type": "player_pass",
-    "player_id": 1,
-    "next_turn": 2,
-    "pass_count": 2
+  "type": "player_pass",
+  "room_id": 1,
+  "player_id": 1,
+  "next_turn": 2,
+  "pass_count": 2
 }
 ```
 
-当 `pass_count == 3` 时，下一家的 `your_turn` 中 `is_free = true`，且桌面清空。
+当 `pass_count == 3` 时，桌面清空，下一位玩家的 `your_turn` 中 `is_free` 为 `true`。
 
-### 玩家手牌为空
+### 6. 玩家出完
 
-**服务端 → 客户端**（广播）
+**服务端 → 房间广播**
 ```json
 {
-    "type": "player_finish",
-    "player_id": 0,
-    "rank": 1
+  "type": "player_finish",
+  "room_id": 1,
+  "player_id": 0,
+  "rank": 1
 }
 ```
 
-### 游戏结束
+### 7. 游戏结束
 
-**服务端 → 客户端**（广播）
+**服务端 → 房间广播**
 ```json
 {
-    "type": "game_over",
-    "winner_id": 0,
-    "ranking": [0, 2, 1, 3]
+  "type": "game_over",
+  "room_id": 1,
+  "ranking": [0, 2, 1, 3]
 }
 ```
+
+> `ranking` 按最终名次排列，第一项为获胜玩家的 `player_id`。
 
 ---
 
 ## 四、聊天
-
-### 发送
 
 **客户端 → 服务端**
 ```json
 { "type": "chat", "text": "好牌" }
 ```
 
-**服务端 → 客户端**（广播给同房间）
+**服务端 → 房间广播**
 ```json
 {
-    "type": "chat",
-    "player_id": 1,
-    "player_name": "亮神",
-    "text": "好牌"
+  "type": "chat",
+  "room_id": 1,
+  "player_id": 1,
+  "player_name": "NONE",
+  "text": "好牌"
 }
 ```
 
@@ -314,28 +348,28 @@
 
 ## 五、错误处理
 
-### 通用错误格式
+### 通用格式
 
 ```json
 {
-    "type": "error",
-    "code": 1001,
-    "message": "房间已满"
+  "type": "error",
+  "code": 1001,
+  "message": "房间已满"
 }
 ```
 
 ### 错误码
 
-| 错误码 | 说明 |
-|--------|------|
-| 1001   | 房间已满 |
-| 1002   | 房间不存在 |
+| 错误码 | 说明                 |
+| ------ | -------------------- |
+| 1001   | 房间已满             |
+| 1002   | 房间不存在           |
 | 1003   | 游戏已开始，无法加入 |
-| 1004   | 出牌不合法 |
-| 1005   | 未轮到该玩家 |
-| 1006   | 未在房间中 |
+| 1004   | 出牌不合法           |
+| 1005   | 未轮到该玩家         |
+| 1006   | 未在房间中           |
 | 1007   | 认证失败，token 无效 |
-| 1008   | 消息格式错误 |
+| 1008   | 消息格式错误         |
 
 ---
 
@@ -347,61 +381,46 @@
 { "num": 3, "suit": 0 }
 ```
 
-num（牌面值）：
+`num` 表示点数：
+
 | 值  | 牌面 |
-|-----|------|
+| --- | ---- |
 | 0   | 3    |
 | 1   | 4    |
-| ... | ...  |
+| 2   | 5    |
+| 3   | 6    |
+| 4   | 7    |
+| 5   | 8    |
+| 6   | 9    |
+| 7   | 10   |
+| 8   | J    |
+| 9   | Q    |
+| 10  | K    |
 | 11  | A    |
 | 12  | 2    |
 
-suit（花色）：
-| 值 | 花色 |
-|----|------|
-| 0  | ♣ 梅花 |
-| 1  | ♦ 方块 |
-| 2  | ♠ 黑桃 |
-| 3  | ♥ 红桃 |
+`suit` 表示花色：
+
+| 值  | 花色   |
+| --- | ------ |
+| 0   | ♣ 梅花 |
+| 1   | ♦ 方块 |
+| 2   | ♠ 黑桃 |
+| 3   | ♥ 红桃 |
 
 ---
 
-## 七、完整交互示例
+## 七、交互示例
 
-```
-1. 客户端连接 WebSocket → ws://localhost:9002
-
-2. 客户端 → { type: "auth" }
-   服务端 → { type: "auth_ok", token: "...", player_id: 1 }
-
-3. 客户端 → { type: "change_name", name: "亮神" }
-   客户端 → { type: "create_room" }
-   服务端 → { type: "room_created", room_id: 1, player_id: 1 }
-
-   玩家 2 连接、认证、改名、加入房间：
-   服务端 → 广播 { type: "player_joined", player_id: 2, player_name: "智宝", ... }
-
-   玩家 3、4 加入...
-
-4. 所有玩家发 { type: "ready" }
-   最后一人 ready 后：
-   服务端 → 单独发给每人 { type: "game_start", hand: [...], first_turn: 0 }
-
-5. 轮到玩家 0：
-   服务端 → { type: "your_turn", player_id: 0, is_free: true, last_play: [] }
-
-6. 玩家 0 出牌：
-   客户端 → { type: "play", cards: [...] }
-   服务端 → 广播 { type: "play_result", player_id: 0, cards: [...], next_turn: 1 }
-
-7. 玩家 1 pass：
-   客户端 → { type: "pass" }
-   服务端 → 广播 { type: "player_pass", player_id: 1, pass_count: 1, next_turn: 2 }
-
-8. 玩家 2、3 pass → pass_count == 3
-   服务端 → { type: "your_turn", player_id: 0, is_free: true }
-
-9. ...继续到有人手牌为空...
-
-10. 服务端 → 广播 { type: "game_over", winner_id: 0, ranking: [0, 2, 1, 3] }
-```
+1. 客户端连接 WebSocket → `ws://localhost:9002`
+2. 客户端 → `{ "type": "auth" }`
+   服务端 → `{ "type": "auth_ok", "token": "..." }`
+3. 客户端 → `{ "type": "change_name", "name": "亮神" }`
+4. 客户端 → `{ "type": "create_room" }`
+   服务端 → `{ "type": "room_created", "room_id": 1, "max_players": 4, "started": false }`
+5. 其他玩家加入房间，服务端广播 `{ "type": "player_joined", ... }`
+6. 所有玩家发送 `{ "type": "ready" }`
+7. 服务端发送 `{ "type": "game_start", "hand": [...], "first_turn": 0 }`
+8. 服务端依次发送 `{ "type": "your_turn", ... }`
+9. 玩家发送 `{ "type": "play", "cards": [...] }` 或 `{ "type": "pass" }`
+10. 服务端发送 `{ "type": "game_over", "ranking": [...] }`

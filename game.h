@@ -119,7 +119,6 @@ class GamePlayer{
         std::sort(hand.begin(),hand.end());
     }
     bool PlayCard(const std::vector<Card>& play){
-        // 先验证所有牌都在手牌中
         std::multiset<Card> tmp(hand.begin(), hand.end());
         for(const Card &c : play){
             auto it = tmp.find(c);
