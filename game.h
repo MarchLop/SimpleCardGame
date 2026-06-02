@@ -71,7 +71,7 @@ CardsType tell_type(const std::vector<Card>& play){
         case 5:{
             if(play[1].num!=play[0].num||
                 play[3].num!=play[4].num||
-                (play[2].num!=play[3].num&&play[1].num!=play[3].num))return CardsType::INVALID;
+                (play[2].num!=play[3].num&&play[1].num!=play[2].num))return CardsType::INVALID;
             return CardsType::THREE_TWO; 
         }
         case 6:{
@@ -137,6 +137,9 @@ class GamePlayer{
         }
         return false;
     }
+    const std::vector<Card>& GetHand() const {
+        return hand;
+    }
     bool over=0;
     private:
     int identity=0;
@@ -150,6 +153,13 @@ class Game{// note who host outside
             auto newplayer = std::make_shared<GamePlayer>();
             players.push_back(newplayer);
             return newplayer;
+        }
+
+        bool RemovePlayer(const std::shared_ptr<GamePlayer>& player){
+            auto it = std::find(players.begin(), players.end(), player);
+            if(it == players.end()) return false;
+            players.erase(it);
+            return true;
         }
 
         bool gamestart(){
