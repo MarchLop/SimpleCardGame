@@ -313,6 +313,7 @@ std::unordered_map<std::string,int> ty=
 {"ready",5},
 {"play",6},
 {"pass",7},
+{"get_rooms",8}
 };
 
 std::shared_ptr<Room> find_room_by_player(Player* player) {
@@ -677,7 +678,27 @@ void on_message(connection_hdl hdl, server::message_ptr msg) {
             });
             break;
         }
-
+        case 8:{
+            auto itp = hdl_to_players.find(hdl);
+            if(itp == hdl_to_players.end()){
+                send_error(hdl, 101, "not_authed");
+                break;
+            }
+            json msgs{
+                {"type","room_list"},
+                {"rooms",json::array()}
+            };
+            for(auto &room: rooms){
+                msgs["rooms"].push_back({
+                    {"room_id",room->id},
+                    {"player_count",(int)room->players.size()},
+                    {"max_players",4},
+                    {"started",room->started}
+                });
+            }
+            ws_server.send(hdl,msgs.dump(),websocketpp::frame::opcode::text);
+            break;
+        }
     }
 }
 
