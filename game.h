@@ -1,5 +1,6 @@
 #pragma once
 
+#include <iostream>
 #include <vector>
 #include <utility>
 #include <random>
@@ -91,19 +92,23 @@ class Deck{
     public:
     Deck(){
         for(int i=Card::THREE;i<=Card::TWO;i++){
-            for(int j=Card::CLOVE;j<=Card::SPADE;j++){
+            for(int j=Card::CLOVE;j<=Card::HERAT;j++){
                 deck.push_back((Card){i,j});
             }
         }
+        std::cerr << "Deck constructed, size=" << deck.size() << "\n";
     }
     Card Drawcard(){
+        std::cerr << "Deck::Drawcard called, size=" << deck.size() << "\n";
         if(deck.empty()) throw std::runtime_error("Deck is empty");
         Card temp=deck.back();
         deck.pop_back();
         return temp;
     }
     void shuffle(){
+        std::cerr << "Deck::shuffle before size=" << deck.size() << "\n";
         std::shuffle(deck.begin(), deck.end(), tt);
+        std::cerr << "Deck::shuffle after size=" << deck.size() << "\n";
     }
     private:
     std::vector<Card> deck;
@@ -163,12 +168,23 @@ class Game{// note who host outside
         }
 
         bool gamestart(){
-            if(players.size()!=4)return 0;
-            deck.shuffle();status=1;
-            for(int j=0;j<13;++j)
-            for(int i=0;i<4;++i){
-                players[i]->DrawCard(deck.Drawcard(),nowplayer,i);
+            if(players.size()!=4) return 0;
+            if(status){
+                std::cerr << "Game::gamestart called but status already true\n";
+                return 0;
             }
+            std::cerr << "Game::gamestart executing shuffle/deal\n";
+            deck.shuffle();
+            try{
+                for(int j=0;j<13;++j)
+                for(int i=0;i<4;++i){
+                    players[i]->DrawCard(deck.Drawcard(),nowplayer,i);
+                }
+            } catch(const std::exception &e){
+                std::cerr << "Exception during gamestart dealing: " << e.what() << "\n";
+                return 0;
+            }
+            status=1;
             turn=0;
             table_clear();
             return 1;
