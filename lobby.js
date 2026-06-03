@@ -28,7 +28,6 @@ saveNickBtn.addEventListener("click", () => {
 });
 
 function showLobby() {
-    document.getElementById("login-section").classList.add("hidden");
     document.getElementById("lobby-section").classList.remove("hidden");
 }
 
@@ -83,3 +82,4 @@ window.onRoomJoined = function(msg) {
 };
 
 setInterval(refreshRooms, 5000);
+
