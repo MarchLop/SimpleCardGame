@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SimpleCardGame - 房间</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- 顶部栏 -->
+        <div id="game-topbar">
+            <span id="room-label">房间 #<span id="room-id">?</span></span>
+            <span id="game-status-text">等待中...</span>
+            <button id="leave-btn" class="btn-small">退出</button>
+        </div>
+
+        <!-- 牌桌区 -->
+        <div id="table-area">
+            <div id="players-info">
+                <div class="player-slot" data-idx="0">
+                    <div class="player-name">-</div>
+                    <div class="player-status"></div>
+                    <div class="player-cards-left"></div>
+                </div>
+                <div class="player-slot" data-idx="1">
+                    <div class="player-name">-</div>
+                    <div class="player-status"></div>
+                    <div class="player-cards-left"></div>
+                </div>
+                <div class="player-slot" data-idx="2">
+                    <div class="player-name">-</div>
+                    <div class="player-status"></div>
+                    <div class="player-cards-left"></div>
+                </div>
+                <div class="player-slot" data-idx="3">
+                    <div class="player-name">-</div>
+                    <div class="player-status"></div>
+                    <div class="player-cards-left"></div>
+                </div>
+            </div>
+            <div id="table-center">
+                <div id="last-play-area"></div>
+                <div id="turn-hint"></div>
+            </div>
+        </div>
+
+        <!-- 手牌区 -->
+        <div id="hand-area">
+            <div id="hand-cards"></div>
+            <div id="hand-actions" class="hidden">
+                <button id="play-btn" class="btn-primary">出牌</button>
+                <button id="pass-btn" class="btn-secondary">不出</button>
+            </div>
+        </div>
+
+        <!-- 准备按钮（游戏未开始时显示） -->
+        <div id="ready-area" class="hidden">
+            <button id="ready-btn" class="btn-primary">准备</button>
+        </div>
+
+        <!-- 聊天 -->
+        <div id="chat-area">
+            <div id="chat-msgs"></div>
+            <div id="chat-input-row">
+                <input type="text" id="chat-input" maxlength="50" placeholder="聊天...">
+                <button id="chat-send-btn">发送</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="ws.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>
