@@ -61,25 +61,33 @@ function updatePlayers() {
 window.onRoomJoined = function(msg) {
     dom.statusText.textContent = `等待中 (${msg.player_count}/${msg.max_players})`;
     // room_joined 不返回 player_id，但 player_joined 广播中会带
+    // 显示准备区域并初始化玩家槽位
+    dom.readyArea.classList.remove("hidden");
+    roomPlayers = [];
+    for (let i = 0; i < 4; i++) roomPlayers.push(null);
+    // 请求当前房间玩家列表以填充已有玩家
+    send({ type: "player_list" });
 };
 
 window.onPlayerJoined = function(msg) {
-    // 后端 player_joined 的 player_id 从 1 开始
-    const exists = roomPlayers.find(p => p && p.id === msg.player_id);
-    if (!exists) {
-        roomPlayers.push({
-            id: msg.player_id,
-            name: msg.player_name || `玩家${msg.player_id}`,
-            ready: false
-        });
-    }
+    // 后端 player_joined 的 player_id 从 1 开始，放到对应槽位
+    const idx = msg.player_id - 1;
+    while (roomPlayers.length < 4) roomPlayers.push(null);
+    roomPlayers[idx] = roomPlayers[idx] || {};
+    roomPlayers[idx].id = msg.player_id;
+    roomPlayers[idx].name = msg.player_name || `玩家${msg.player_id}`;
+    roomPlayers[idx].ready = roomPlayers[idx].ready || false;
+    roomPlayers[idx].isMe = (roomPlayers[idx].id === myPlayerId);
     updatePlayers();
     dom.statusText.textContent = `等待中 (${msg.player_count}/4)`;
 };
 
 window.onPlayerLeft = function(msg) {
-    roomPlayers = roomPlayers.filter(p => p && p.id !== msg.player_id);
-    while (roomPlayers.length < 4) roomPlayers.push(null);
+    // 清除对应槽位
+    const idx = msg.player_id - 1;
+    if (idx >= 0 && idx < roomPlayers.length) {
+        roomPlayers[idx] = null;
+    }
     updatePlayers();
 };
 
@@ -95,20 +103,48 @@ window.onPlayerNameChanged = function(msg) {
 };
 
 window.onPlayerReady = function(msg) {
-    const p = roomPlayers.find(x => x && x.id === msg.player_id);
-    if (p) p.ready = true;
+    const idx = msg.player_id - 1;
+    if (idx >=0 && idx < roomPlayers.length && roomPlayers[idx]) {
+        roomPlayers[idx].ready = true;
+    }
+    updatePlayers();
+};
+
+window.onPlayerList = function(msg) {
+    roomPlayers = [];
+    for (let i = 0; i < 4; i++) roomPlayers.push(null);
+    if (Array.isArray(msg.players)) {
+        msg.players.forEach(player => {
+            const idx = (player.player_id || 0) - 1;
+            if (idx >= 0 && idx < roomPlayers.length) {
+                roomPlayers[idx] = {
+                    id: player.player_id,
+                    name: player.player_name || `玩家${player.player_id}`,
+                    ready: !!player.ready,
+                    isMe: player.player_id === myPlayerId
+                };
+            }
+        });
+    }
     updatePlayers();
 };
 
 // ===== 准备按钮 =====
 dom.readyBtn.addEventListener("click", () => {
-    send({ type: "ready" });
-    dom.readyBtn.disabled = true;
-    dom.readyBtn.textContent = "已准备";
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        console.log('[game] clicking ready -> sending ready');
+        send({ type: "ready" });
+        dom.readyBtn.disabled = true;
+        dom.readyBtn.textContent = "已准备";
+    } else {
+        console.warn('[game] ready clicked but WebSocket not open');
+        alert('WebSocket 未连接，无法发送准备，请稍候再试');
+    }
 });
 
 // ===== 游戏开始 =====
 window.onGameStart = function(msg) {
+    console.log('[game] onGameStart', msg);
     dom.readyArea.classList.add("hidden");
     dom.handActions.classList.remove("hidden");
     myHand = msg.hand || [];
@@ -119,6 +155,7 @@ window.onGameStart = function(msg) {
 
 // ===== 轮到谁 =====
 window.onYourTurn = function(msg) {
+    console.log('[game] onYourTurn', msg);
     roomPlayers.forEach(p => { if (p) p.isActive = (p.id === msg.player_id); });
     updatePlayers();
 

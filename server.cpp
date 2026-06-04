@@ -313,7 +313,8 @@ std::unordered_map<std::string,int> ty=
 {"ready",5},
 {"play",6},
 {"pass",7},
-{"get_rooms",8}
+{"get_rooms",8},
+{"player_list",9}
 };
 
 std::shared_ptr<Room> find_room_by_player(Player* player) {
@@ -406,9 +407,12 @@ void on_message(connection_hdl hdl, server::message_ptr msg) {
             auto room_ptr = rooms.back();
             Room &room = *room_ptr;
             room.players.push_back(itp->second);
-            room.player_map[itp->second] = room.game.AddPlayer();
+            // ensure ready flag is cleared when a player is added (token reuse shouldn't carry over ready)
+            itp->second->ready = false;
+            //room.player_map[itp->second] = room.game.AddPlayer();
             msgt["type"] = "room_created";
             msgt["room_id"] = next_room_id;
+            msgt["player_id"] = 1;
             msgt["player_count"] = 1;
             msgt["max_players"] = 4;
             msgt["started"] = false;
@@ -466,10 +470,13 @@ void on_message(connection_hdl hdl, server::message_ptr msg) {
                 break;
             }
             room.players.push_back(itp->second);
-            room.player_map[itp->second] = room.game.AddPlayer();
+            // ensure ready flag is cleared when a player joins
+            itp->second->ready = false;
+          //  room.player_map[itp->second] = room.game.AddPlayer();
             json msgs{
                 {"type","room_joined"},
                 {"room_id",roomid},
+                {"player_id",(int)room.players.size()},
                 {"player_count",(int)room.players.size()},
                 {"max_players",4},
                 {"started",false}
@@ -561,6 +568,16 @@ void on_message(connection_hdl hdl, server::message_ptr msg) {
             }
             player->ready = true;
             int ready_count = std::count_if(room.players.begin(), room.players.end(), [](Player* p){ return p->ready; });
+            // Debug: print ready states for diagnosis
+            std::cerr << "[ready-debug] room=" << room.id << " ready_count=" << ready_count << " players=" << room.players.size() << "\n";
+            for(size_t ii=0; ii<room.players.size(); ++ii){
+                Player* pp = room.players[ii];
+                if(pp){
+                    std::cerr << "  slot=" << ii+1 << " name='" << pp->name << "' ready=" << pp->ready << "\n";
+                } else {
+                    std::cerr << "  slot=" << ii+1 << " <empty>\n";
+                }
+            }
             int player_id = get_player_index(room, player);
             json ready_msg{
                 {"type","player_ready"},
@@ -569,20 +586,49 @@ void on_message(connection_hdl hdl, server::message_ptr msg) {
                 {"ready_count", ready_count},
                 {"player_count", (int)room.players.size()}
             };
+            // send ready_ok ack to the requesting client
+            json ack{
+                {"type","ready_ok"},
+                {"room_id", room.id},
+                {"player_id", player_id},
+                {"ready_count", ready_count}
+            };
+            ws_server.send(hdl, ack.dump(), websocketpp::frame::opcode::text);
             broadcast(room, ready_msg.dump());
+            std::cerr<<(int)room.players.size()<<"players"<<std::endl; 
             if(ready_count == (int)room.players.size() && room.players.size() == 4){
+                std::cerr << "[ready-debug] all ready met, scheduling game_start for room=" << room.id << "\n";
+
                 auto room_shared = room_ptr;
+                for(auto player:room_ptr->players){
+                    room_ptr->player_map[player]=room_ptr->game.AddPlayer();
+                }
                 websocketpp::lib::asio::post(ws_server.get_io_context(), [room_shared](){
                     Room &r = *room_shared;
-                    if(!all_ready(r)) return;
-                    if((int)r.players.size() != 4) return;
-                    if(r.started) return;
+                    std::cerr << "[ready-debug] running scheduled game_start for room=" << r.id << " players=" << r.players.size() << " game.players=" << r.game.players.size() << " status=" << r.game.status << " started=" << r.started << "\n";
+                    if(!all_ready(r)) {
+                        std::cerr << "[ready-debug] abort game_start: not all_ready\n";
+                        return;
+                    }
+                    if((int)r.players.size() != 4) {
+                        std::cerr << "[ready-debug] abort game_start: wrong player count=" << r.players.size() << "\n";
+                        return;
+                    }
+                    if(r.started) {
+                        std::cerr << "[ready-debug] abort game_start: already started\n";
+                        return;
+                    }
+                    std::cerr << "[ready-debug] invoking Game::gamestart()\n";
                     if(!r.game.status && r.game.gamestart()){
+                        std::cerr << "[ready-debug] game_start succeeded, sending to players\n";
                         r.started = true;
                         r.current_turn = r.game.nowplayer;
                         for(auto &p : r.players){
                             auto gp_it2 = r.player_map.find(p);
-                            if(gp_it2 == r.player_map.end()) continue;
+                            if(gp_it2 == r.player_map.end()) {
+                                std::cerr << "[ready-debug] missing player_map entry for player in room=" << r.id << "\n";
+                                continue;
+                            }
                             json start_msg{
                                 {"type","game_start"},
                                 {"room_id", r.id},
@@ -595,9 +641,12 @@ void on_message(connection_hdl hdl, server::message_ptr msg) {
                                     {"suit", card.suit}
                                 });
                             }
+                            std::cerr << "[ready-debug] sending game_start to player_id=" << (get_player_index(r, p)) << "\n";
                             ws_server.send(p->hdl, start_msg.dump(), websocketpp::frame::opcode::text);
                         }
                         start_next_turn(room_shared);
+                    } else {
+                        std::cerr << "[ready-debug] abort game_start: gamestart() false or already status=" << r.game.status << "\n";
                     }
                 });
             }
@@ -699,6 +748,33 @@ void on_message(connection_hdl hdl, server::message_ptr msg) {
             ws_server.send(hdl,msgs.dump(),websocketpp::frame::opcode::text);
             break;
         }
+        case 9:{
+            auto itp = hdl_to_players.find(hdl);
+            if(itp == hdl_to_players.end()){
+                send_error(hdl, 101, "not_authed");
+                break;
+            }
+            auto room = find_room_by_player(itp->second);
+            if(!room){
+                send_error(hdl, 305, "not_in_room");
+                break;
+            }
+            json msgs{
+                {"type","player_list"},
+                {"room_id", room->id},
+                {"players",json::array()}
+            };
+            for(size_t idx = 0; idx < room->players.size(); ++idx){
+                Player* player = room->players[idx];
+                msgs["players"].push_back({
+                    {"player_id", (int)idx + 1},
+                    {"player_name", player->name},
+                    {"ready", player->ready}
+                });
+            }
+            ws_server.send(hdl,msgs.dump(),websocketpp::frame::opcode::text);
+            break;
+        }
     }
 }
 
@@ -715,6 +791,7 @@ void on_close(connection_hdl hdl) {
         for(auto &kv : auth_players){
             if(&kv.second == p){
                 kv.second.hdl = connection_hdl();
+                kv.second.ready = false;
                 break;
             }
         }

@@ -57,8 +57,12 @@ function connect() {
 }
 
 function send(obj) {
+    const payload = JSON.stringify(obj);
     if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify(obj));
+        console.log('[ws] send ->', payload);
+        ws.send(payload);
+    } else {
+        console.warn('[ws] send blocked, socket not open:', payload);
     }
 }
 
@@ -75,6 +79,7 @@ function setStatus(state) {
 
 function handleMsg(msg) {
     const type = msg.type;
+    console.log('[ws] handleMsg type=', type, msg);
 
     if (type === "auth_ok") {
         myToken = msg.token;
@@ -104,14 +109,28 @@ function handleMsg(msg) {
         return;
     }
     if (type === "room_created" && typeof onRoomCreated === "function") {
-        onRoomCreated(msg);
+           // assign local player id for the room creator
+            myPlayerId = (typeof msg.player_id !== 'undefined' ? msg.player_id : msg.player_count) || myPlayerId;
+            inRoom = msg.room_id || inRoom;
+            console.log('[ws] recv room_created -> myPlayerId=', myPlayerId, 'room=', inRoom, msg);
+            onRoomCreated(msg);
         return;
     }
     if (type === "room_joined" && typeof onRoomJoined === "function") {
-        onRoomJoined(msg);
+           // the server's room_joined reply now includes player_id for this client
+            myPlayerId = (typeof msg.player_id !== 'undefined' ? msg.player_id : msg.player_count) || myPlayerId;
+            inRoom = msg.room_id || inRoom;
+            console.log('[ws] recv room_joined -> myPlayerId=', myPlayerId, 'room=', inRoom, msg);
+            onRoomJoined(msg);
         return;
     }
     if (type === "player_joined" && typeof onPlayerJoined === "function") {
+        // If we don't have myPlayerId yet, and server gives us a player_name matching our saved name, use it
+        if (!myPlayerId && myName && msg.player_name && msg.player_name === myName) {
+            myPlayerId = msg.player_id;
+            inRoom = msg.room_id || inRoom;
+        }
+        console.log('[ws] recv player_joined -> player_id=', msg.player_id, 'myPlayerId=', myPlayerId, 'room=', msg.room_id);
         onPlayerJoined(msg);
         return;
     }
@@ -124,15 +143,45 @@ function handleMsg(msg) {
         return;
     }
     if (type === "player_ready" && typeof onPlayerReady === "function") {
+        // keep local ready state in sync
+        console.log('[ws] recv player_ready ->', msg);
         onPlayerReady(msg);
         return;
     }
 
-    if (type === "game_start" && typeof onGameStart === "function") {
-        onGameStart(msg);
+    if (type === "player_list" && typeof onPlayerList === "function") {
+        console.log('[ws] recv player_list ->', msg);
+        onPlayerList(msg);
+        return;
+    }
+
+    if (type === "game_start") {
+        console.log('[ws] received game_start', msg, 'onGameStart=', typeof onGameStart);
+        if (typeof onGameStart === "function") {
+            onGameStart(msg);
+            return;
+        }
+    }
+    if (type === "ready_ok") {
+        console.log('[ws] received ready_ok', msg);
+        // Prefer callback if provided
+        if (typeof onReadyOk === "function") {
+            onReadyOk(msg);
+            return;
+        }
+        // Fallback: safely update UI only if globals exist
+        if (typeof myPlayerId !== 'undefined' && msg.player_id && msg.player_id === myPlayerId) {
+            if (typeof dom !== 'undefined' && dom && dom.readyBtn) {
+                try {
+                    dom.readyBtn.disabled = true;
+                    dom.readyBtn.textContent = '已准备';
+                } catch (e) { /* ignore */ }
+            }
+        }
         return;
     }
     if (type === "your_turn" && typeof onYourTurn === "function") {
+        console.log('[ws] received your_turn', msg);
         onYourTurn(msg);
         return;
     }
@@ -161,6 +210,7 @@ function handleMsg(msg) {
         onError(msg);
         return;
     }
+    console.warn('[ws] unknown message type or missing handler', type, msg);
 }
 
 // 自动连接

@@ -168,7 +168,11 @@ class Game{// note who host outside
         }
 
         bool gamestart(){
-            if(players.size()!=4) return 0;
+            std::cerr << "Game::gamestart entered players=" << players.size() << " status=" << status << "\n";
+            if(players.size()!=4) {
+                std::cerr << "Game::gamestart failed: wrong player count=" << players.size() << "\n";
+                return 0;
+            }
             if(status){
                 std::cerr << "Game::gamestart called but status already true\n";
                 return 0;
