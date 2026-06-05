@@ -135,7 +135,7 @@ dom.readyBtn.addEventListener("click", () => {
         console.log('[game] clicking ready -> sending ready');
         send({ type: "ready" });
         dom.readyBtn.disabled = true;
-        dom.readyBtn.textContent = "已准备";
+        dom.readyBtn.textContent = "✓ 已准备";
     } else {
         console.warn('[game] ready clicked but WebSocket not open');
         alert('WebSocket 未连接，无法发送准备，请稍候再试');
@@ -250,6 +250,7 @@ window.onGameOver = function(msg) {
     const winnerId = ranking[0];
     const winner = roomPlayers.find(x => x && x.id === winnerId);
     dom.turnHint.textContent = `游戏结束！${winner ? winner.name : '玩家'} 获胜！`;
+    showToast(`游戏结束！${winner ? winner.name : '玩家'} 获胜！`, "success");
     dom.handActions.classList.add("hidden");
     selectedCards = [];
 };
@@ -275,6 +276,14 @@ window.onChatMsg = function(msg) {
     dom.chatMsgs.scrollTop = dom.chatMsgs.scrollHeight;
 };
 
+function showToast(message, type) {
+    const el = document.createElement('div');
+    el.className = 'toast' + (type === 'error' ? ' toast-error' : type === 'success' ? ' toast-success' : '');
+    el.textContent = message;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 2000);
+}
+
 function escapeHtml(s) {
     return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
@@ -287,7 +296,7 @@ dom.leaveBtn.addEventListener("click", () => {
 
 window.onError = function(msg) {
     if (msg.code === 1004 || msg.message === "invalid_play") {
-        alert("出牌无效：" + (msg.message || "不合法的牌型"));
+        showToast(msg.message || "不合法的牌型", "error");
     } else {
         console.warn("server error:", msg.code, msg.message);
     }
