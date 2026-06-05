@@ -154,3 +154,95 @@ h2 { font-size: 18px; }
     button { font-size: 13px; padding: 6px 12px; }
     #hand-actions button { padding: 8px 20px; font-size: 14px; }
 }
+
+/* ===== 布局优化 ===== */
+#table-area {
+    background: linear-gradient(135deg, rgba(0,0,0,.2), rgba(0,100,0,.1));
+    border: 2px solid rgba(255,215,0,.2);
+}
+
+.player-slot {
+    background: rgba(255,255,255,.1);
+    border: 1px solid rgba(255,255,255,.1);
+    transition: all .3s;
+}
+.player-active {
+    border-color: #ffd700 !important;
+    box-shadow: 0 0 12px rgba(255,215,0,.3);
+    background: rgba(255,215,0,.1) !important;
+}
+
+/* 身份标记 */
+.player-cards-left { font-size: 12px; }
+
+/* 出牌提示高亮 */
+.turn-highlight {
+    font-size: 18px;
+    font-weight: bold;
+    padding: 8px;
+    border-radius: 8px;
+    background: rgba(255,215,0,.15);
+    animation: pulse 1.5s ease-in-out infinite;
+}
+.gameover-highlight {
+    font-size: 20px;
+    font-weight: bold;
+    color: #ffd700;
+    text-shadow: 0 0 10px rgba(255,215,0,.5);
+}
+.table-clear-hint {
+    color: #aaa;
+    font-size: 13px;
+    font-style: italic;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: .6; }
+}
+
+/* 牌桌图片优化 */
+#last-play-area {
+    min-height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+#last-play-area img {
+    height: 80px;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.3);
+    transition: transform .2s;
+}
+#last-play-area img:hover {
+    transform: scale(1.1);
+}
+
+/* 手牌图片稍大一点 */
+#hand-cards img {
+    height: 110px;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0,0,0,.4);
+    transition: transform .15s, box-shadow .15s;
+}
+#hand-cards img.selected {
+    transform: translateY(-18px);
+    box-shadow: 0 6px 20px rgba(255,215,0,.6);
+}
+
+/* 游戏页整体布局 */
+#game-topbar {
+    background: rgba(0,0,0,.2);
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin-bottom: 4px;
+}
+
+/* 手机适配 */
+@media (max-width: 480px) {
+    #last-play-area img { height: 65px; }
+    #hand-cards img { height: 85px; }
+    .turn-highlight { font-size: 15px; }
+}
