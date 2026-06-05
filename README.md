@@ -57,6 +57,14 @@ g++ -std=c++17 server.cpp -o server -lwebsocketpp -lpthread
 ├── server.cpp   # WebSocket 服务端
 └── output/      # 编译输出
 ```
+## 还在修的bug/没做的功能
+- 出牌和pass的计时器似乎没停（
+- 同一个人不能连续出牌俩次
+- 没有显示当前出牌人
+- 当前牌桌上的牌没显示好
+- 布局不好看
+- 没有出牌后标记身份
+
 
 ## 依赖
 

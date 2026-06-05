@@ -110,7 +110,7 @@ bool is_free_turn(const Room& room) {
 
 void sync_current_turn(std::shared_ptr<Room> room_ptr) {
     if(room_ptr->players.empty()) return;
-    int size = static_cast<int>(room_ptr->players.size());
+    int size = static_cast<int>(room_ptr->players.size  ());
     int idx = room_ptr->game.nowplayer % size;
     int attempts = 0;
     while(attempts < size && room_ptr->game.players[idx]->over){
@@ -370,39 +370,23 @@ void on_message(connection_hdl hdl, server::message_ptr msg) {
         }
         case 1:{
             auto itp = hdl_to_players.find(hdl);
-            if(itp == hdl_to_players.end()){
-                json err{
-                    {"type","error"},
-                    {"msg","not_authed"},
-                    {"code",101}
-                };
-                ws_server.send(hdl, err.dump(),websocketpp::frame::opcode::text);
-                break;
-            }
+            if(itp == hdl_to_players.end()){send_error(hdl,101,"not_authed");break;}
+
             itp->second->name = j.value("name", std::string("NONE"));
-            json resp;
-            resp["type"] = "change_name_ok";
-            resp["name"] = itp->second->name;
+            json resp{
+                {"type", "change_name_ok"},
+                {"name", itp->second->name}
+            };
             ws_server.send(hdl, resp.dump(), websocketpp::frame::opcode::text);
             break;
         }
         case 2:{
             auto itp = hdl_to_players.find(hdl);
-            json msgt;
-            if(itp == hdl_to_players.end()){
-                msgt["type"] = "error";
-                msgt["code"] = 201;
-                msgt["message"] = "not_authed";
-                ws_server.send(hdl, msgt.dump(), websocketpp::frame::opcode::text);
-                break;
-            }
-            if((int)rooms.size() >= 10){
-                msgt["type"] = "error";
-                msgt["code"] = 202 ;
-                msgt["message"] = "max_rooms";
-                ws_server.send(hdl, msgt.dump(), websocketpp::frame::opcode::text);
-                break;
-            }
+            
+            if(itp == hdl_to_players.end()){send_error(hdl,201,"not_authed");break;}
+
+            if((int)rooms.size() >= 10){send_error(hdl,202,"max_rooms");break;}
+
             rooms.emplace_back(std::make_shared<Room>(next_room_id, ws_server.get_io_context()));
             auto room_ptr = rooms.back();
             Room &room = *room_ptr;
@@ -410,65 +394,37 @@ void on_message(connection_hdl hdl, server::message_ptr msg) {
             // ensure ready flag is cleared when a player is added (token reuse shouldn't carry over ready)
             itp->second->ready = false;
             //room.player_map[itp->second] = room.game.AddPlayer();
-            msgt["type"] = "room_created";
-            msgt["room_id"] = next_room_id;
-            msgt["player_id"] = 1;
-            msgt["player_count"] = 1;
-            msgt["max_players"] = 4;
-            msgt["started"] = false;
-            ws_server.send(hdl, msgt.dump(), websocketpp::frame::opcode::text);
+            json msgs{
+                {"type","room_created"},
+                {"room_id",next_room_id},
+                {"player_id",1},
+                {"player_count",1},
+                {"max_players", 4},
+                {"started", false}
+            };
+            
+            ws_server.send(hdl, msgs.dump(), websocketpp::frame::opcode::text);
             next_room_id++;
             break;
         }
         case 3:{
-            if(!j.contains("room_id")){
-                json err{
-                    {"type","error"},
-                    {"code",300},
-                    {"msg","none_content"}
-                };
-                ws_server.send(hdl,err.dump(),websocketpp::frame::opcode::text);
-                break;
-            }
+            if(!j.contains("room_id")){send_error(hdl,300,"none_content");break;}
+
             auto itp = hdl_to_players.find(hdl);
             json msgt;
-            if(itp == hdl_to_players.end()){
-                msgt["type"] = "error";
-                msgt["code"] = 301;
-                msgt["message"] = "not_authed";
-                ws_server.send(hdl, msgt.dump(), websocketpp::frame::opcode::text);
-                break;
-            }
+            if(itp == hdl_to_players.end()){send_error(hdl,301,"not_authed");break;}
+
             int roomid = j.value("room_id", 0);
-            if(roomid <= 0 || roomid > (int)rooms.size()){
-                json err{
-                    {"type","error"},
-                    {"code",302},
-                    {"msg","no_found_room"}
-                };
-                ws_server.send(hdl,err.dump(),websocketpp::frame::opcode::text);
-                break;
-            }
+            if(roomid <= 0 || roomid > (int)rooms.size()){send_error(hdl,302,"no_found_room");break;}
+
             auto room_ptr = rooms[roomid - 1];
             Room &room = *room_ptr;
-            if(room.players.size() == 4){
-                json err{
-                    {"type","error"},
-                    {"code",303},
-                    {"msg","rooms_player_enough"}
-                };
-                ws_server.send(hdl,err.dump(),websocketpp::frame::opcode::text);
-                break;
-            }
+            if(room.players.size() == 4){send_error(hdl,303,"rooms_player_enough");break;}
+
             if(std::find(room.players.begin(), room.players.end(), itp->second) != room.players.end()){
-                json err{
-                    {"type","error"},
-                    {"code",304},
-                    {"msg","already_in_room"}
-                };
-                ws_server.send(hdl,err.dump(),websocketpp::frame::opcode::text);
-                break;
+                send_error(hdl,304,"already_in_room");break;
             }
+
             room.players.push_back(itp->second);
             // ensure ready flag is cleared when a player joins
             itp->second->ready = false;
@@ -494,26 +450,12 @@ void on_message(connection_hdl hdl, server::message_ptr msg) {
         }
         case 4:{
             auto itp = hdl_to_players.find(hdl);
-            if(itp == hdl_to_players.end()){
-                json err{
-                    {"type","error"},
-                    {"code",101},
-                    {"message","not_authed"}
-                };
-                ws_server.send(hdl, err.dump(), websocketpp::frame::opcode::text);
-                break;
-            }
+            if(itp == hdl_to_players.end()){send_error(hdl,101,"not_authed");break;}
+
             Player* player = itp->second;
             auto room_ptr = find_room_by_player(player);
-            if(!room_ptr){
-                json err{
-                    {"type","error"},
-                    {"code",305},
-                    {"message","not_in_room"}
-                };
-                ws_server.send(hdl, err.dump(), websocketpp::frame::opcode::text);
-                break;
-            }
+            if(!room_ptr){send_error(hdl,305,"not_in_room");break;}
+
             Room &room = *room_ptr;
             auto it = std::find(room.players.begin(), room.players.end(), player);
             int player_id = (int)(std::distance(room.players.begin(), it) + 1);
@@ -541,26 +483,12 @@ void on_message(connection_hdl hdl, server::message_ptr msg) {
         }
         case 5:{
             auto itp = hdl_to_players.find(hdl);
-            if(itp == hdl_to_players.end()){
-                json err{
-                    {"type","error"},
-                    {"code",101},
-                    {"message","not_authed"}
-                };
-                ws_server.send(hdl, err.dump(), websocketpp::frame::opcode::text);
-                break;
-            }
+            if(itp == hdl_to_players.end()){send_error(hdl, 101, "not_authed");break;}
+
             Player* player = itp->second;
             auto room_ptr = find_room_by_player(player);
-            if(!room_ptr){
-                json err{
-                    {"type","error"},
-                    {"code",305},
-                    {"message","not_in_room"}
-                };
-                ws_server.send(hdl, err.dump(), websocketpp::frame::opcode::text);
-                break;
-            }
+            if(!room_ptr){send_error(hdl, 305, "not_in_room");break;}
+
             Room &room = *room_ptr;
             if(room.started){
                 send_error(hdl, 306, "game_already_started");
