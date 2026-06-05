@@ -7,9 +7,10 @@ const roomId = parseInt(urlParams.get("room")) || 0;
 
 document.getElementById("room-id").textContent = roomId;
 
+const POS = ["top", "right", "bottom", "left"];  // 上下左右顺序
+
 const dom = {
     statusText: document.getElementById("game-status-text"),
-    playersInfo: document.getElementById("players-info"),
     lastPlayArea: document.getElementById("last-play-area"),
     turnHint: document.getElementById("turn-hint"),
     handCards: document.getElementById("hand-cards"),
@@ -38,21 +39,25 @@ function loadNick() {
 }
 
 function updatePlayers() {
-    const slots = dom.playersInfo.querySelectorAll(".player-slot");
     for (let i = 0; i < 4; i++) {
-        const slot = slots[i];
+        const pos = POS[i];
+        const el = document.getElementById("player-" + pos);
+        if (!el) continue;
         const p = roomPlayers[i];
+        const nameEl = el.querySelector(".player-name");
+        const statusEl = el.querySelector(".player-status");
+        const leftEl = el.querySelector(".player-cards-left");
         if (p) {
-            slot.querySelector(".player-name").textContent = p.name || `玩家${p.id}`;
-            slot.querySelector(".player-status").textContent = p.ready ? "✓ 已准备" : "";
-            slot.querySelector(".player-cards-left").textContent = p.cardsLeft != null ? `${p.cardsLeft}张` : "";
-            slot.classList.toggle("player-active", p.isActive);
-            slot.querySelector(".player-name").style.color = p.isMe ? "#ffd700" : "";
+            nameEl.textContent = p.name || `玩家${p.id}`;
+            statusEl.textContent = p.ready ? "✓" : "";
+            leftEl.textContent = p.cardsLeft != null ? `${p.cardsLeft}张` : "";
+            el.classList.toggle("player-active", p.isActive);
+            nameEl.style.color = p.isMe ? "#ffd700" : "";
         } else {
-            slot.querySelector(".player-name").textContent = "-";
-            slot.querySelector(".player-status").textContent = "";
-            slot.querySelector(".player-cards-left").textContent = "";
-            slot.classList.remove("player-active");
+            nameEl.textContent = "-";
+            statusEl.textContent = "";
+            leftEl.textContent = "";
+            el.classList.remove("player-active");
         }
     }
 }
@@ -159,6 +164,15 @@ window.onYourTurn = function(msg) {
     roomPlayers.forEach(p => { if (p) p.isActive = (p.id === msg.player_id); });
     updatePlayers();
 
+    // 如果是自由出牌（清牌桌），清除所有玩家的出牌区
+    if (msg.is_free) {
+        for (let i = 0; i < 4; i++) {
+            const pos = POS[i];
+            const el = document.querySelector("#player-" + pos + " .player-played");
+            if (el) el.innerHTML = "";
+        }
+    }
+
     if (msg.last_play && msg.last_play.length > 0) {
         dom.lastPlayArea.innerHTML = msg.last_play.map(c =>
             `<img src="${cardImg(c.num, c.suit)}" alt="card">`
@@ -221,6 +235,9 @@ window.onPlayResult = function(msg) {
         renderHand();
         dom.handActions.classList.add("hidden");
     }
+    // 在对应玩家位置显示出牌
+    showPlayedCards(msg.player_id, msg.cards);
+    // 中央也显示出牌
     dom.lastPlayArea.innerHTML = msg.cards.map(c =>
         `<img src="${cardImg(c.num, c.suit)}" alt="card">`
     ).join("");
@@ -237,7 +254,8 @@ window.onPlayInvalid = function(msg) {
 
 window.onPlayerPass = function(msg) {
     dom.turnHint.textContent = "";
-    dom.lastPlayArea.innerHTML = "";
+    // pass 玩家清空出牌区
+    showPlayedCards(msg.player_id, []);
 };
 
 window.onPlayerFinish = function(msg) {
@@ -275,6 +293,22 @@ window.onChatMsg = function(msg) {
     dom.chatMsgs.appendChild(el);
     dom.chatMsgs.scrollTop = dom.chatMsgs.scrollHeight;
 };
+
+function showPlayedCards(playerId, cards) {
+    const idx = roomPlayers.findIndex(p => p && p.id === playerId);
+    if (idx < 0 || idx >= 4) return;
+    const pos = POS[idx];
+    const playedEl = document.querySelector("#player-" + pos + " .player-played");
+    if (!playedEl) return;
+    playedEl.innerHTML = cards.map(c =>
+        '<img src="' + cardImg(c.num, c.suit) + '" alt="card">'
+    ).join("");
+    // 更新手牌数
+    const p = roomPlayers[idx];
+    if (p && cards.length > 0) {
+        // 不在这里减手牌，只在 play_result 里处理
+    }
+}
 
 function showToast(message, type) {
     const el = document.createElement('div');
