@@ -15,33 +15,52 @@
             <button id="leave-btn" class="btn-small">退出</button>
         </div>
 
-        <!-- 牌桌区 -->
+        <!-- 牌桌区（四家分坐上下左右） -->
         <div id="table-area">
-            <div id="players-info">
-                <div class="player-slot" data-idx="0">
-                    <div class="player-name">-</div>
-                    <div class="player-status"></div>
-                    <div class="player-cards-left"></div>
-                </div>
-                <div class="player-slot" data-idx="1">
-                    <div class="player-name">-</div>
-                    <div class="player-status"></div>
-                    <div class="player-cards-left"></div>
-                </div>
-                <div class="player-slot" data-idx="2">
-                    <div class="player-name">-</div>
-                    <div class="player-status"></div>
-                    <div class="player-cards-left"></div>
-                </div>
-                <div class="player-slot" data-idx="3">
-                    <div class="player-name">-</div>
-                    <div class="player-status"></div>
-                    <div class="player-cards-left"></div>
+            <!-- 上方玩家（对面） -->
+            <div id="player-top" class="player-pos">
+                <div class="player-name">-</div>
+                <div class="player-played"></div>
+                <div class="player-info">
+                    <span class="player-status"></span>
+                    <span class="player-cards-left"></span>
                 </div>
             </div>
-            <div id="table-center">
-                <div id="last-play-area"></div>
-                <div id="turn-hint"></div>
+            
+            <div id="table-mid">
+                <!-- 左方玩家 -->
+                <div id="player-left" class="player-pos">
+                    <div class="player-name">-</div>
+                    <div class="player-played"></div>
+                    <div class="player-info">
+                        <span class="player-status"></span>
+                        <span class="player-cards-left"></span>
+                    </div>
+                </div>
+                <!-- 中央牌桌 -->
+                <div id="table-center">
+                    <div id="turn-hint"></div>
+                    <div id="last-play-area"></div>
+                </div>
+                <!-- 右方玩家 -->
+                <div id="player-right" class="player-pos">
+                    <div class="player-name">-</div>
+                    <div class="player-played"></div>
+                    <div class="player-info">
+                        <span class="player-status"></span>
+                        <span class="player-cards-left"></span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 下方玩家（自己） -->
+            <div id="player-bottom" class="player-pos">
+                <div class="player-name">-</div>
+                <div class="player-played"></div>
+                <div class="player-info">
+                    <span class="player-status"></span>
+                    <span class="player-cards-left"></span>
+                </div>
             </div>
         </div>
 
