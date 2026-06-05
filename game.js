@@ -116,6 +116,9 @@ dom.readyBtn.addEventListener("click", () => {
 window.onGameStart = function(msg) {
     dom.readyArea.classList.add("hidden");
     dom.handActions.classList.remove("hidden");
+    // 重置准备按钮状态（下次游戏可用）
+    dom.readyBtn.disabled = false;
+    dom.readyBtn.textContent = "准备";
     myHand = msg.hand || [];
     dom.statusText.textContent = "游戏进行中";
     renderHand();
