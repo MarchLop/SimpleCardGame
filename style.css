@@ -1,9 +1,22 @@
 /* ===== 全局 ===== */
+:root {
+    --bg-primary: #1a4a2a;
+    --bg-secondary: #2d6b4f;
+    --bg-card: rgba(255,255,255,0.08);
+    --text-primary: #f5f5f5;
+    --text-secondary: #b8c5b8;
+    --accent-gold: #ffcc33;
+    --accent-green: #4db656;
+    --accent-red: #e55353;
+    --shadow-dark: rgba(0,0,0,0.3);
+    --shadow-light: rgba(255,255,255,0.1);
+}
+
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
     font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
-    background: #1a5c2a; /* 牌桌绿 */
-    color: #fff;
+    background: var(--bg-primary);
+    color: var(--text-primary);
     min-height: 100vh;
     overflow-x: hidden;
 }
@@ -14,9 +27,15 @@ button {
     border-radius: 6px;
     padding: 8px 16px;
     font-size: 14px;
-    transition: opacity .2s;
+    -webkit-tap-highlight-color: rgba(255,204,51,0.3);
+    touch-action: manipulation;
+    transition: transform .15s, opacity .2s;
+    min-height: 44px;
 }
-button:active { opacity: .7; }
+button:active {
+    transform: scale(0.95);
+    opacity: .8;
+}
 .hidden { display: none !important; }
 
 /* ===== 状态栏 ===== */
@@ -76,7 +95,7 @@ h2 { font-size: 18px; }
 
 /* ===== 牌桌 ===== */
 #table-area {
-    background: rgba(0,0,0,.15); border-radius: 12px; padding: 10px;
+    background: linear-gradient(135deg, rgba(0,0,0,.2) 0%, rgba(0,100,0,.1) 100%); border-radius: 12px; padding: 10px; border: 1px solid var(--shadow-light);
     margin: 8px 0; min-height: 200px;
 }
 #players-info {
@@ -89,7 +108,16 @@ h2 { font-size: 18px; }
 .player-name { font-weight: bold; }
 .player-status { font-size: 12px; color: #aaa; }
 .player-cards-left { font-size: 12px; color: #ffd700; }
-.player-active { border: 2px solid #ffd700; }
+.player-active {
+    border-color: var(--accent-gold) !important;
+    box-shadow: 0 0 20px rgba(255,204,51,.4), 0 0 40px rgba(255,204,51,.2);
+    animation: playerPulse 2s ease-in-out infinite;
+}
+
+@keyframes playerPulse {
+    0%, 100% { box-shadow: 0 0 20px rgba(255,204,51,.4); }
+    50% { box-shadow: 0 0 30px rgba(255,204,51,.6); }
+}
 #table-center {
     text-align: center; min-height: 70px; padding: 8px;
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
@@ -100,8 +128,11 @@ h2 { font-size: 18px; }
 
 /* ===== 手牌 ===== */
 #hand-area {
-    position: sticky; bottom: 0; background: rgba(0,0,0,.6);
-    border-radius: 12px 12px 0 0; padding: 8px; margin-top: 8px;
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: linear-gradient(180deg, rgba(0,0,0,.4) 0%, rgba(0,0,0,.8) 100%);
+    border-radius: 12px 12px 0 0; padding: 8px; padding-bottom: max(8px, env(safe-area-inset-bottom));
+    z-index: 100;
+    box-shadow: 0 -4px 20px var(--shadow-dark);
 }
 #hand-cards {
     display: flex; gap: 4px; overflow-x: auto; padding: 4px 0;
@@ -112,8 +143,8 @@ h2 { font-size: 18px; }
     scroll-snap-align: start; flex-shrink: 0;
 }
 #hand-cards img.selected {
-    transform: translateY(-16px);
-    box-shadow: 0 4px 12px rgba(255,215,0,.5);
+    transform: translateY(-20px) scale(1.05);
+    box-shadow: 0 8px 24px rgba(255,204,51,.6);
 }
 #hand-actions {
     display: flex; gap: 10px; justify-content: center; margin-top: 8px;
@@ -225,7 +256,7 @@ h2 { font-size: 18px; }
     height: 110px;
     border-radius: 8px;
     box-shadow: 0 2px 6px rgba(0,0,0,.4);
-    transition: transform .15s, box-shadow .15s;
+    transition: all .2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 #hand-cards img.selected {
     transform: translateY(-18px);
@@ -245,4 +276,62 @@ h2 { font-size: 18px; }
     #last-play-area img { height: 65px; }
     #hand-cards img { height: 85px; }
     .turn-highlight { font-size: 15px; }
+}
+
+/* Toast 提示 */
+.toast {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0,0,0,.85);
+    color: #fff;
+    padding: 14px 28px;
+    border-radius: 10px;
+    z-index: 1000;
+    font-size: 15px;
+    text-align: center;
+    pointer-events: none;
+    animation: toastAnim 2s ease-in-out forwards;
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,.1);
+}
+.toast-error { border-color: var(--accent-red); color: #ff8a80; }
+.toast-success { border-color: var(--accent-green); }
+
+@keyframes toastAnim {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(.85); }
+    10% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(.9); }
+}
+
+/* 加载动画 */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+.loading-dot {
+    display: inline-block;
+    width: 12px; height: 12px;
+    border: 2px solid var(--accent-gold);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin .8s linear infinite;
+}
+
+/* 安全区域适配 */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+    #hand-area { padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+}
+@supports (padding-top: env(safe-area-inset-top)) {
+    #game-topbar { padding-top: max(8px, env(safe-area-inset-top)); }
+}
+
+/* 小屏优化 */
+@media (max-width: 375px) {
+    #hand-cards img { height: 80px; }
+    button { min-height: 44px; font-size: 13px; }
+    #table-area { padding: 6px; }
+    .player-slot { font-size: 12px; padding: 4px 8px; }
 }
