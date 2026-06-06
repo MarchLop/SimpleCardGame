@@ -1,4 +1,4 @@
-/* ===== 全局 ===== */
+
 :root {
     --bg-primary: #1a4a2a;
     --bg-secondary: #2d6b4f;
@@ -11,7 +11,6 @@
     --shadow-dark: rgba(0,0,0,0.3);
     --shadow-light: rgba(255,255,255,0.1);
 }
-
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
     font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
@@ -22,58 +21,30 @@ body {
 }
 input, button { font-family: inherit; font-size: inherit; }
 button {
-    cursor: pointer;
-    border: none;
-    border-radius: 6px;
-    padding: 8px 16px;
-    font-size: 14px;
+    cursor: pointer; border: none; border-radius: 6px;
+    padding: 8px 16px; font-size: 14px;
     -webkit-tap-highlight-color: rgba(255,204,51,0.3);
     touch-action: manipulation;
     transition: transform .15s, opacity .2s;
     min-height: 44px;
 }
-button:active {
-    transform: scale(0.95);
-    opacity: .8;
-}
+button:active { transform: scale(0.95); opacity: .8; }
 .hidden { display: none !important; }
-
-/* ===== 状态栏 ===== */
-#status-bar {
-    display: flex; align-items: center; gap: 8px;
-    padding: 6px 12px; background: rgba(0,0,0,.4); font-size: 13px;
-}
+#status-bar { display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: rgba(0,0,0,.4); font-size: 13px; }
 .dot-offline { width: 10px; height: 10px; border-radius: 50%; background: #888; }
 .dot-online { background: #4caf50; }
 .dot-error { background: #f44336; }
-
-/* ===== 大厅 ===== */
 #app { max-width: 600px; margin: 0 auto; padding: 12px; }
-h1 { text-align: center; font-size: 28px; margin: 20px 0; color: #ffd700; text-shadow: 1px 1px 2px rgba(0,0,0,.5); }
+h1 { text-align: center; font-size: 28px; margin: 20px 0; color: var(--accent-gold); text-shadow: 1px 1px 2px rgba(0,0,0,.5); }
 h2 { font-size: 18px; }
 .section { margin-top: 16px; }
-.section-header {
-    display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
-}
-.input-group {
-    display: flex; gap: 8px; align-items: center;
-}
+.section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.input-group { display: flex; gap: 8px; align-items: center; }
 .input-group label { font-size: 14px; white-space: nowrap; }
-.input-group input {
-    flex: 1; padding: 8px 12px; border-radius: 6px; border: 1px solid #aaa;
-    font-size: 14px; background: #fff; color: #333;
-}
-.input-group button { background: #ffd700; color: #333; font-weight: bold; }
-
-/* ===== 房间列表 ===== */
-#room-list {
-    background: rgba(255,255,255,.1); border-radius: 8px; padding: 8px;
-    max-height: 300px; overflow-y: auto;
-}
-.room-item {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 10px 12px; background: rgba(255,255,255,.08); border-radius: 6px; margin-bottom: 6px;
-}
+.input-group input { flex: 1; padding: 8px 12px; border-radius: 6px; border: 1px solid #aaa; font-size: 14px; background: #fff; color: #333; }
+.input-group button { background: var(--accent-gold); color: #333; font-weight: bold; }
+#room-list { background: var(--bg-card); border-radius: 8px; padding: 8px; max-height: 300px; overflow-y: auto; }
+.room-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: rgba(255,255,255,.08); border-radius: 6px; margin-bottom: 6px; }
 .room-item:last-child { margin-bottom: 0; }
 .room-info { font-size: 14px; }
 .room-info .tag { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 12px; margin-left: 6px; }
@@ -81,56 +52,108 @@ h2 { font-size: 18px; }
 .tag-playing { background: #f44336; }
 .btn-join { background: #4caf50; color: #fff; font-size: 13px; padding: 6px 14px; }
 .empty-msg { text-align: center; padding: 20px; color: #aaa; font-size: 14px; }
-.btn-primary { background: #ffd700; color: #333; font-weight: bold; }
+.btn-primary { background: var(--accent-gold); color: #333; font-weight: bold; }
 .btn-secondary { background: #888; color: #fff; }
-
-/* ===== 游戏页顶部 ===== */
-#game-topbar {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 8px 0; font-size: 14px; flex-wrap: wrap; gap: 4px;
-}
+#game-topbar { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; font-size: 14px; flex-wrap: wrap; gap: 4px; background: rgba(0,0,0,.2); border-radius: 8px; padding: 8px 12px; margin-bottom: 4px; }
 #room-label { font-weight: bold; }
 #game-status-text { color: #ccc; }
 .btn-small { background: #c0392b; color: #fff; padding: 4px 12px; font-size: 13px; }
 
-/* ===== 牌桌 ===== */
+/* ===== 牌桌（四家分坐） ===== */
 #table-area {
-    background: linear-gradient(135deg, rgba(0,0,0,.2) 0%, rgba(0,100,0,.1) 100%); border-radius: 12px; padding: 10px; border: 1px solid var(--shadow-light);
-    margin: 8px 0; min-height: 200px;
+    background: linear-gradient(135deg, rgba(0,0,0,.2) 0%, rgba(0,100,0,.1) 100%);
+    border-radius: 12px;
+    padding: 8px;
+    margin: 8px 0;
+    min-height: 320px;
+    border: 1px solid var(--shadow-light);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
 }
-#players-info {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px;
+#table-mid {
+    display: flex;
+    align-items: stretch;
+    flex: 1;
+    gap: 4px;
 }
-.player-slot {
-    background: rgba(255,255,255,.08); border-radius: 6px; padding: 6px 10px;
-    display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 13px;
+.player-pos {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    background: var(--bg-card);
+    transition: all .3s;
+    min-width: 50px;
 }
-.player-name { font-weight: bold; }
-.player-status { font-size: 12px; color: #aaa; }
-.player-cards-left { font-size: 12px; color: #ffd700; }
-.player-active {
-    border-color: var(--accent-gold) !important;
-    box-shadow: 0 0 20px rgba(255,204,51,.4), 0 0 40px rgba(255,204,51,.2);
+.player-pos .player-name {
+    font-weight: bold;
+    font-size: 13px;
+    white-space: nowrap;
+}
+.player-pos .player-info {
+    display: flex;
+    gap: 4px;
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+.player-played {
+    min-height: 55px;
+    display: flex;
+    gap: 2px;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+.player-played img {
+    height: 45px;
+    border-radius: 4px;
+    box-shadow: 0 1px 4px var(--shadow-dark);
+}
+#player-top .player-played { flex-direction: row; }
+#player-bottom .player-played { flex-direction: row; }
+#player-left .player-played { flex-direction: column; }
+#player-right .player-played { flex-direction: column; }
+.player-pos.player-active {
+    border: 2px solid var(--accent-gold);
+    box-shadow: 0 0 20px rgba(255,204,51,.4);
     animation: playerPulse 2s ease-in-out infinite;
 }
-
 @keyframes playerPulse {
     0%, 100% { box-shadow: 0 0 20px rgba(255,204,51,.4); }
     50% { box-shadow: 0 0 30px rgba(255,204,51,.6); }
 }
 #table-center {
-    text-align: center; min-height: 70px; padding: 8px;
-    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+    flex: 1;
+    text-align: center;
+    min-height: 100px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
 }
-#last-play-area { display: flex; gap: 4px; justify-content: center; flex-wrap: wrap; }
-#last-play-area img { height: 70px; }
-#turn-hint { font-size: 14px; color: #ccc; }
+#last-play-area {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+#last-play-area img {
+    height: 70px;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px var(--shadow-dark);
+}
+#turn-hint { font-size: 14px; color: var(--text-secondary); }
 
-/* ===== 手牌 ===== */
+/* ===== 手牌区 ===== */
 #hand-area {
     position: fixed; bottom: 0; left: 0; right: 0;
     background: linear-gradient(180deg, rgba(0,0,0,.4) 0%, rgba(0,0,0,.8) 100%);
-    border-radius: 12px 12px 0 0; padding: 8px; padding-bottom: max(8px, env(safe-area-inset-bottom));
+    border-radius: 12px 12px 0 0; padding: 8px;
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
     z-index: 100;
     box-shadow: 0 -4px 20px var(--shadow-dark);
 }
@@ -139,8 +162,10 @@ h2 { font-size: 18px; }
     scroll-snap-type: x mandatory;
 }
 #hand-cards img {
-    height: 100px; cursor: pointer; border-radius: 6px; transition: transform .15s;
+    height: 100px; cursor: pointer; border-radius: 8px;
     scroll-snap-align: start; flex-shrink: 0;
+    box-shadow: 0 2px 6px var(--shadow-dark);
+    transition: all .2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 #hand-cards img.selected {
     transform: translateY(-20px) scale(1.05);
@@ -150,147 +175,29 @@ h2 { font-size: 18px; }
     display: flex; gap: 10px; justify-content: center; margin-top: 8px;
 }
 #hand-actions button { padding: 10px 28px; font-size: 16px; border-radius: 8px; }
-
-/* ===== 准备区 ===== */
-#ready-area {
-    text-align: center; margin: 12px 0;
-}
+#ready-area { text-align: center; margin: 12px 0; }
 #ready-btn { padding: 12px 36px; font-size: 18px; border-radius: 8px; }
 
 /* ===== 聊天 ===== */
 #chat-area {
     margin-top: 12px; background: rgba(0,0,0,.3); border-radius: 8px; padding: 8px;
+    margin-bottom: 180px;
 }
-#chat-msgs {
-    max-height: 120px; overflow-y: auto; margin-bottom: 6px;
-    display: flex; flex-direction: column; gap: 4px;
-}
+#chat-msgs { max-height: 120px; overflow-y: auto; margin-bottom: 6px; display: flex; flex-direction: column; gap: 4px; }
 .chat-msg { font-size: 13px; padding: 2px 4px; }
 .chat-msg .sender { font-weight: bold; margin-right: 4px; }
-.chat-msg .sender.me { color: #ffd700; }
+.chat-msg .sender.me { color: var(--accent-gold); }
 #chat-input-row { display: flex; gap: 6px; }
 #chat-input { flex: 1; padding: 6px 10px; border-radius: 6px; border: 1px solid #aaa; font-size: 13px; }
 #chat-send-btn { background: #555; color: #fff; padding: 6px 14px; font-size: 13px; }
 
-/* ===== 响应式 ===== */
-@media (min-width: 600px) {
-    #players-info {
-        grid-template-columns: repeat(4, 1fr);
-    }
-    #hand-cards img { height: 130px; }
-    #last-play-area img { height: 100px; }
-}
-@media (max-width: 380px) {
-    #hand-cards img { height: 80px; }
-    button { font-size: 13px; padding: 6px 12px; }
-    #hand-actions button { padding: 8px 20px; font-size: 14px; }
-}
-
-/* ===== 布局优化 ===== */
-#table-area {
-    background: linear-gradient(135deg, rgba(0,0,0,.2), rgba(0,100,0,.1));
-    border: 2px solid rgba(255,215,0,.2);
-}
-
-.player-slot {
-    background: rgba(255,255,255,.1);
-    border: 1px solid rgba(255,255,255,.1);
-    transition: all .3s;
-}
-.player-active {
-    border-color: #ffd700 !important;
-    box-shadow: 0 0 12px rgba(255,215,0,.3);
-    background: rgba(255,215,0,.1) !important;
-}
-
-/* 身份标记 */
-.player-cards-left { font-size: 12px; }
-
-/* 出牌提示高亮 */
-.turn-highlight {
-    font-size: 18px;
-    font-weight: bold;
-    padding: 8px;
-    border-radius: 8px;
-    background: rgba(255,215,0,.15);
-    animation: pulse 1.5s ease-in-out infinite;
-}
-.gameover-highlight {
-    font-size: 20px;
-    font-weight: bold;
-    color: #ffd700;
-    text-shadow: 0 0 10px rgba(255,215,0,.5);
-}
-.table-clear-hint {
-    color: #aaa;
-    font-size: 13px;
-    font-style: italic;
-}
-
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: .6; }
-}
-
-/* 牌桌图片优化 */
-#last-play-area {
-    min-height: 80px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    flex-wrap: wrap;
-}
-#last-play-area img {
-    height: 80px;
-    border-radius: 6px;
-    box-shadow: 0 2px 8px rgba(0,0,0,.3);
-    transition: transform .2s;
-}
-#last-play-area img:hover {
-    transform: scale(1.1);
-}
-
-/* 手牌图片稍大一点 */
-#hand-cards img {
-    height: 110px;
-    border-radius: 8px;
-    box-shadow: 0 2px 6px rgba(0,0,0,.4);
-    transition: all .2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-#hand-cards img.selected {
-    transform: translateY(-18px);
-    box-shadow: 0 6px 20px rgba(255,215,0,.6);
-}
-
-/* 游戏页整体布局 */
-#game-topbar {
-    background: rgba(0,0,0,.2);
-    border-radius: 8px;
-    padding: 8px 12px;
-    margin-bottom: 4px;
-}
-
-/* 手机适配 */
-@media (max-width: 480px) {
-    #last-play-area img { height: 65px; }
-    #hand-cards img { height: 85px; }
-    .turn-highlight { font-size: 15px; }
-}
-
-/* Toast 提示 */
+/* ===== Toast ===== */
 .toast {
-    position: fixed;
-    top: 50%;
-    left: 50%;
+    position: fixed; top: 50%; left: 50%;
     transform: translate(-50%, -50%);
-    background: rgba(0,0,0,.85);
-    color: #fff;
-    padding: 14px 28px;
-    border-radius: 10px;
-    z-index: 1000;
-    font-size: 15px;
-    text-align: center;
+    background: rgba(0,0,0,.85); color: #fff;
+    padding: 14px 28px; border-radius: 10px;
+    z-index: 1000; font-size: 15px; text-align: center;
     pointer-events: none;
     animation: toastAnim 2s ease-in-out forwards;
     backdrop-filter: blur(8px);
@@ -298,7 +205,6 @@ h2 { font-size: 18px; }
 }
 .toast-error { border-color: var(--accent-red); color: #ff8a80; }
 .toast-success { border-color: var(--accent-green); }
-
 @keyframes toastAnim {
     0% { opacity: 0; transform: translate(-50%, -50%) scale(.85); }
     10% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
@@ -306,32 +212,21 @@ h2 { font-size: 18px; }
     100% { opacity: 0; transform: translate(-50%, -50%) scale(.9); }
 }
 
-/* 加载动画 */
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-.loading-dot {
-    display: inline-block;
-    width: 12px; height: 12px;
-    border: 2px solid var(--accent-gold);
-    border-top-color: transparent;
-    border-radius: 50%;
-    animation: spin .8s linear infinite;
-}
-
-/* 安全区域适配 */
+/* ===== 响应式 ===== */
 @supports (padding-bottom: env(safe-area-inset-bottom)) {
     #hand-area { padding-bottom: max(8px, env(safe-area-inset-bottom)); }
 }
 @supports (padding-top: env(safe-area-inset-top)) {
     #game-topbar { padding-top: max(8px, env(safe-area-inset-top)); }
 }
-
-/* 小屏优化 */
+@media (max-width: 480px) {
+    #hand-cards img { height: 85px; }
+    #last-play-area img { height: 60px; }
+    .player-played img { height: 40px; }
+}
 @media (max-width: 375px) {
-    #hand-cards img { height: 80px; }
+    #hand-cards img { height: 75px; }
     button { min-height: 44px; font-size: 13px; }
     #table-area { padding: 6px; }
-    .player-slot { font-size: 12px; padding: 4px 8px; }
+    .player-pos { padding: 4px 6px; font-size: 12px; }
 }
