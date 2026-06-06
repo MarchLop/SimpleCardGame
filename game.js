@@ -26,6 +26,8 @@ const dom = {
 };
 
 let selectedCards = [];
+let turnTimer = null;
+let turnSeconds = 30;
 
 // 登录后加入房间
 window.onAuthOk = function() {
@@ -159,8 +161,39 @@ window.onGameStart = function(msg) {
 };
 
 // ===== 轮到谁 =====
+function startTurnTimer() {
+    if (turnTimer) clearInterval(turnTimer);
+    turnSeconds = 30;
+    const hintEl = document.getElementById("turn-hint");
+    if (hintEl) {
+        hintEl.textContent = hintEl.textContent.split("(")[0].trim() + " (" + turnSeconds + "s)";
+    }
+    turnTimer = setInterval(() => {
+        turnSeconds--;
+        if (hintEl) {
+            const base = hintEl.textContent.replace(/\(\d+s\)/, "").trim() || "轮到你了";
+            hintEl.textContent = base + " (" + turnSeconds + "s)";
+        }
+        if (turnSeconds <= 0) {
+            clearInterval(turnTimer);
+            turnTimer = null;
+            // 超时自动过牌
+            send({ type: "pass" });
+            dom.handActions.classList.add("hidden");
+        }
+    }, 1000);
+}
+
+function stopTurnTimer() {
+    if (turnTimer) {
+        clearInterval(turnTimer);
+        turnTimer = null;
+    }
+}
+
 window.onYourTurn = function(msg) {
     console.log('[game] onYourTurn', msg);
+    stopTurnTimer();
     roomPlayers.forEach(p => { if (p) p.isActive = (p.id === msg.player_id); });
     updatePlayers();
 
@@ -184,10 +217,12 @@ window.onYourTurn = function(msg) {
     if (msg.player_id === myPlayerId) {
         dom.turnHint.textContent = msg.is_free ? "自由出牌" : "轮到你了";
         dom.handActions.classList.remove("hidden");
+        startTurnTimer();
     } else {
         const p = roomPlayers.find(x => x && x.id === msg.player_id);
         dom.turnHint.textContent = `等待 ${p ? p.name : '对方'} 出牌...`;
         dom.handActions.classList.add("hidden");
+        stopTurnTimer();
     }
 };
 
@@ -227,6 +262,7 @@ dom.passBtn.addEventListener("click", () => {
 
 // ===== 出牌结果 =====
 window.onPlayResult = function(msg) {
+    stopTurnTimer();
     if (msg.player_id === myPlayerId) {
         msg.cards.forEach(c => {
             const idx = myHand.findIndex(h => h.num === c.num && h.suit === c.suit);
@@ -235,9 +271,7 @@ window.onPlayResult = function(msg) {
         renderHand();
         dom.handActions.classList.add("hidden");
     }
-    // 在对应玩家位置显示出牌
     showPlayedCards(msg.player_id, msg.cards);
-    // 中央也显示出牌
     dom.lastPlayArea.innerHTML = msg.cards.map(c =>
         `<img src="${cardImg(c.num, c.suit)}" alt="card">`
     ).join("");
@@ -253,8 +287,8 @@ window.onPlayInvalid = function(msg) {
 };
 
 window.onPlayerPass = function(msg) {
+    stopTurnTimer();
     dom.turnHint.textContent = "";
-    // pass 玩家清空出牌区
     showPlayedCards(msg.player_id, []);
 };
 
@@ -264,6 +298,7 @@ window.onPlayerFinish = function(msg) {
 };
 
 window.onGameOver = function(msg) {
+    stopTurnTimer();
     const ranking = msg.ranking || [];
     const winnerId = ranking[0];
     const winner = roomPlayers.find(x => x && x.id === winnerId);
