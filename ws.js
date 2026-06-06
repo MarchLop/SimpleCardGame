@@ -2,7 +2,7 @@
  * ws.js — WebSocket 连接与认证
  */
 const WS_URL = "ws://localhost:9002";
-const CARD_BASE = "https://raw.githubusercontent.com/djp952/external-vectorcards/master/svg/";
+const CARD_BASE = "./cards/";
 
 // 牌面映射（game.h 定义：THREE=0 ... ACE=11 TWO=12）
 const SUIT_NAMES = ["clubs", "diamonds", "spades", "hearts"];
