@@ -161,11 +161,18 @@ dom.readyBtn.addEventListener("click", () => {
 window.onGameStart = function(msg) {
     console.log('[game] onGameStart', msg);
     dom.readyArea.classList.add("hidden");
-    dom.handActions.classList.remove("hidden");
+    dom.handActions.classList.add("hidden");
     myHand = msg.hand || [];
+    myIdentity = msg.identity || 0;
     dom.statusText.textContent = "游戏进行中";
     renderHand();
     updatePlayers();
+    // 显示身份
+    if (myIdentity) {
+        const team = myIdentity === 1 ? "你: ♠K队" : myIdentity === 2 ? "你: ♥2队" : "你: ♥2+♠K";
+        dom.turnHint.textContent = team;
+        setTimeout(() => { dom.turnHint.textContent = ""; }, 3000);
+    }
 };
 
 // ===== 轮到谁 =====
