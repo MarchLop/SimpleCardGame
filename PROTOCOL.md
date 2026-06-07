@@ -264,6 +264,43 @@
 - `last_player`：上一次出牌玩家的 `player_id`。
 - `is_free`：若为 `true`，表示本回合可以随意出牌，不需要压制之前的牌。
 
+**服务端 → 所有玩家**
+
+```json
+  "type": "table_status",
+  "room_id": 1,
+  "player_status": [
+    {"player_id" : 1,
+    "playerhand_size":13,
+    "player_public_identity":0,
+    "is_over" : false
+    }
+    {"player_id" : 2,
+    "playerhand_size":13,
+    "player_public_identity":0,
+    "is_over" : false
+    }
+    {"player_id" : 2,
+    "playerhand_size":13,
+    "player_public_identity":0,
+    "is_over" : false
+    }
+    {"player_id" : 2,
+    "playerhand_size":13,
+    "player_public_identity":0,
+    "is_over" : false
+    }
+  ],
+  "last_play": [
+    { "num": 8, "suit": 1 },
+    { "num": 8, "suit": 2 }
+  ],
+  "last_player": 3,
+  "is_free": false
+
+
+```
+
 ### 4. 出牌
 
 **客户端 → 服务端**
