@@ -50,20 +50,8 @@ function updatePlayers() {
         const statusEl = el.querySelector(".player-status");
         const leftEl = el.querySelector(".player-cards-left");
         if (p) {
-            let name = p.name || `玩家${p.id}`;
-            // 加身份标记
-            if (p.identity) {
-                name += p.identity === 1 ? " ♠" : p.identity === 2 ? " ♥" : " ♥♠";
-            }
-            nameEl.textContent = name;
-            // 显示状态：pass/已准备/手牌数
-            if (p.passed) {
-                statusEl.textContent = "✕ pass";
-                statusEl.style.color = "#ff8a80";
-            } else {
-                statusEl.textContent = p.ready ? "✓" : "";
-                statusEl.style.color = "";
-            }
+            nameEl.textContent = p.name || `玩家${p.id}`;
+            statusEl.textContent = p.ready ? "✓" : "";
             leftEl.textContent = p.cardsLeft != null ? `${p.cardsLeft}张` : "";
             el.classList.toggle("player-active", p.isActive);
             nameEl.style.color = p.isMe ? "#ffd700" : "";
@@ -167,17 +155,9 @@ window.onGameStart = function(msg) {
     dom.readyArea.classList.add("hidden");
     dom.handActions.classList.remove("hidden");
     myHand = msg.hand || [];
-    // 保存身份标记
-    myIdentity = msg.identity || 0;
     dom.statusText.textContent = "游戏进行中";
     renderHand();
     updatePlayers();
-    // 显示自己的身份
-    if (myIdentity) {
-        const team = myIdentity === 1 ? "♠K" : myIdentity === 2 ? "♥2" : "♥2+♠K";
-        dom.turnHint.textContent = "你的身份: " + team;
-        setTimeout(() => { dom.turnHint.textContent = ""; }, 3000);
-    }
 };
 
 // ===== 轮到谁 =====
@@ -223,8 +203,6 @@ window.onYourTurn = function(msg) {
             const pos = POS[i];
             const el = document.querySelector("#player-" + pos + " .player-played");
             if (el) el.innerHTML = "";
-            // 清除 pass 标记
-            if (roomPlayers[i]) roomPlayers[i].passed = false;
         }
     }
 
@@ -249,7 +227,6 @@ window.onYourTurn = function(msg) {
 };
 
 let myPlayerId = null;
-let myIdentity = 0;
 
 // ===== 手牌渲染 =====
 function renderHand() {
@@ -313,10 +290,6 @@ window.onPlayerPass = function(msg) {
     stopTurnTimer();
     dom.turnHint.textContent = "";
     showPlayedCards(msg.player_id, []);
-    // 标记该玩家已 pass
-    const p = roomPlayers.find(x => x && x.id === msg.player_id);
-    if (p) p.passed = true;
-    updatePlayers();
 };
 
 window.onPlayerFinish = function(msg) {
