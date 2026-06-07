@@ -312,6 +312,34 @@ window.onPlayerFinish = function(msg) {
     dom.turnHint.textContent = `${p ? p.name : '玩家'} 出完了！第 ${msg.rank} 名`;
 };
 
+window.onTableStatus = function(msg) {
+    console.log('[game] onTableStatus', msg);
+    if (msg.player_status) {
+        for (const ps of msg.player_status) {
+            const p = roomPlayers.find(x => x && x.id === ps.player_id);
+            if (p) {
+                p.cardsLeft = ps.playerhand_size;
+                // 身份标记通过局内可见性显示（不显示具体身份）
+                if (ps.player_public_identity) {
+                    p.publicIdentity = ps.player_public_identity;
+                }
+                if (ps.is_over) {
+                    p.finished = true;
+                }
+            }
+        }
+        updatePlayers();
+    }
+    // 牌桌显示
+    if (msg.last_play && msg.last_play.length > 0) {
+        dom.lastPlayArea.innerHTML = msg.last_play.map(c =>
+            `<img src="${cardImg(c.num, c.suit)}" alt="card">`
+        ).join("");
+    } else {
+        dom.lastPlayArea.innerHTML = "";
+    }
+};
+
 window.onGameOver = function(msg) {
     stopTurnTimer();
     const ranking = msg.ranking || [];
