@@ -7,7 +7,8 @@ const roomId = parseInt(urlParams.get("room")) || 0;
 
 document.getElementById("room-id").textContent = roomId;
 
-const POS = ["top", "right", "bottom", "left"];  // 上下左右顺序
+// 玩家座位顺序：自己(bottom)→右→上→左
+const POS = ["bottom", "right", "top", "left"];
 
 const dom = {
     statusText: document.getElementById("game-status-text"),
@@ -67,24 +68,31 @@ function updatePlayers() {
 // ===== 房间事件 =====
 window.onRoomJoined = function(msg) {
     dom.statusText.textContent = `等待中 (${msg.player_count}/${msg.max_players})`;
-    // room_joined 不返回 player_id，但 player_joined 广播中会带
-    // 显示准备区域并初始化玩家槽位
     dom.readyArea.classList.remove("hidden");
-    roomPlayers = [];
-    for (let i = 0; i < 4; i++) roomPlayers.push(null);
-    // 请求当前房间玩家列表以填充已有玩家
+    // 初始化座位：player_id 从 1 开始
+    // 自己=bottom, 2=right, 3=top, 4=left
+    roomPlayers = [null, null, null, null];
     send({ type: "player_list" });
+    // 如果我是创建者（player_count=1），把自己放在 bottom
+    if (msg.player_count === 1 && msg.player_id) {
+        const idx = msg.player_id - 1;  // player_id 1 → idx 0 = bottom
+        roomPlayers[idx] = roomPlayers[idx] || {};
+        roomPlayers[idx].id = msg.player_id;
+        roomPlayers[idx].name = myName || "我";
+        roomPlayers[idx].ready = false;
+        roomPlayers[idx].isMe = true;
+        updatePlayers();
+    }
 };
 
 window.onPlayerJoined = function(msg) {
-    // 后端 player_joined 的 player_id 从 1 开始，放到对应槽位
-    const idx = msg.player_id - 1;
-    while (roomPlayers.length < 4) roomPlayers.push(null);
+    const idx = msg.player_id - 1;  // player_id 1→bottom, 2→right, 3→top, 4→left
+    if (idx < 0 || idx >= 4) return;
     roomPlayers[idx] = roomPlayers[idx] || {};
     roomPlayers[idx].id = msg.player_id;
     roomPlayers[idx].name = msg.player_name || `玩家${msg.player_id}`;
     roomPlayers[idx].ready = roomPlayers[idx].ready || false;
-    roomPlayers[idx].isMe = (roomPlayers[idx].id === myPlayerId);
+    roomPlayers[idx].isMe = (msg.player_id === myPlayerId);
     updatePlayers();
     dom.statusText.textContent = `等待中 (${msg.player_count}/4)`;
 };
