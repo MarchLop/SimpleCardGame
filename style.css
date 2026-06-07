@@ -65,7 +65,7 @@ h2 { font-size: 18px; }
     border-radius: 12px;
     padding: 8px;
     margin: 8px 0;
-    min-height: 280px;
+    min-height: 240px;
     border: 1px solid var(--shadow-light);
     display: flex;
     flex-direction: column;
@@ -82,11 +82,11 @@ h2 { font-size: 18px; }
     flex-direction: column;
     align-items: center;
     gap: 4px;
-    padding: 6px 8px;
-    border-radius: 8px;
+    padding: 4px 6px;
+    border-radius: 6px;
     background: var(--bg-card);
     transition: all .3s;
-    min-width: 50px;
+    min-width: 40px;
 }
 .player-pos .player-name {
     font-weight: bold;
@@ -100,7 +100,7 @@ h2 { font-size: 18px; }
     color: var(--text-secondary);
 }
 .player-played {
-    min-height: 45px;
+    min-height: 35px;
     display: flex;
     gap: 2px;
     align-items: center;
@@ -108,10 +108,10 @@ h2 { font-size: 18px; }
     flex-wrap: wrap;
 }
 .player-played img {
-    height: 40px;
-    border-radius: 4px;
-    box-shadow: -1px 1px 3px var(--shadow-dark);
-    margin-left: -8px;
+    height: 32px;
+    border-radius: 3px;
+    box-shadow: -1px 1px 2px var(--shadow-dark);
+    margin-left: -6px;
 }
 .player-played img:first-child { margin-left: 0; }
 #player-top .player-played { flex-direction: row; }
@@ -144,9 +144,9 @@ h2 { font-size: 18px; }
     flex-wrap: wrap;
 }
 #last-play-area img {
-    height: 70px;
-    border-radius: 6px;
-    box-shadow: 0 2px 8px var(--shadow-dark);
+    height: 65px;
+    border-radius: 5px;
+    box-shadow: 0 2px 6px var(--shadow-dark);
 }
 #turn-hint { font-size: 14px; color: var(--text-secondary); }
 
@@ -236,7 +236,7 @@ h2 { font-size: 18px; }
 @media (max-width: 480px) {
     #hand-cards img { height: 85px; }
     #last-play-area img { height: 60px; }
-    .player-played img { height: 40px; }
+    .player-played img { height: 28px; }
 }
 @media (max-width: 375px) {
     #hand-cards img { height: 75px; }
