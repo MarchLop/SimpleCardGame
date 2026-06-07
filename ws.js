@@ -155,6 +155,10 @@ function handleMsg(msg) {
         return;
     }
 
+    if (type === "table_status" && typeof onTableStatus === "function") {
+        onTableStatus(msg);
+        return;
+    }
     if (type === "game_start") {
         console.log('[ws] received game_start', msg, 'onGameStart=', typeof onGameStart);
         if (typeof onGameStart === "function") {
