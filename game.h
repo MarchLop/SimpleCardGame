@@ -119,8 +119,8 @@ class GamePlayer{
     void DrawCard(const Card &d,int &now,int &i){
         hand.push_back(d);
         if(d.num==Card::THREE&&d.suit==Card::CLOVE)now=i;
-        if(d.num==Card::TWO&&d.suit==Card::HERAT)identity=1;
-        if(d.num==Card::KING&&d.suit==Card::SPADE)identity=1;
+        if(d.num==Card::TWO&&d.suit==Card::HERAT)identity+=2;
+        if(d.num==Card::KING&&d.suit==Card::SPADE)identity+=1;
         std::sort(hand.begin(),hand.end());
     }
     bool PlayCard(const std::vector<Card>& play){
@@ -146,8 +146,8 @@ class GamePlayer{
         return hand;
     }
     bool over=0;
-    private:
     int identity=0;
+    private:
     std::vector<Card> hand;
     
 };

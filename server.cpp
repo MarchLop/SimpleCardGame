@@ -110,7 +110,7 @@ bool is_free_turn(const Room& room) {
 
 void sync_current_turn(std::shared_ptr<Room> room_ptr) {
     if(room_ptr->players.empty()) return;
-    int size = static_cast<int>(room_ptr->players.size  ());
+    int size = static_cast<int>(room_ptr->players.size());
     int idx = room_ptr->game.nowplayer % size;
     int attempts = 0;
     while(attempts < size && room_ptr->game.players[idx]->over){
@@ -561,6 +561,7 @@ void on_message(connection_hdl hdl, server::message_ptr msg) {
                                 {"type","game_start"},
                                 {"room_id", r.id},
                                 {"hand", json::array()},
+                                {"identity",r.player_map[p]->identity},
                                 {"first_turn", r.game.nowplayer + 1}
                             };
                             for(const auto &card : gp_it2->second->GetHand()){
