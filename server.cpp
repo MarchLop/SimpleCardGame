@@ -32,6 +32,7 @@ struct Player{
     std::string token;
     std::string name="NONE";
     bool ready=0;
+    int public_identity=0;
 };
 
 struct GameAction {
@@ -147,6 +148,23 @@ void send_your_turn(std::shared_ptr<Room> room_ptr) {
         {"is_free", is_free_turn(*room_ptr)}
     };
     ws_server.send(player->hdl, msg.dump(), websocketpp::frame::opcode::text);
+    json msgb{
+        {"type","table_status"},
+        {"room_id",room_ptr->id},
+        {"player_status",json::array()},
+        {"last_play", last_play},
+        {"last_player", last_player},
+        {"is_free", is_free_turn(*room_ptr)}
+    };
+    int now=0;
+    for(auto player : room_ptr->players){
+        msgb["player_status"].push_back({
+            {"player_id", ++now},
+            {"playerhand_size",room_ptr->player_map[player]->GetHand().size()},
+            {"player_public_identity",player->public_identity},
+            {"is_over",room_ptr->player_map[player]->over}
+        });
+    }
 }
 
 void start_next_turn(std::shared_ptr<Room> room_ptr);
@@ -202,7 +220,10 @@ void apply_play(std::shared_ptr<Room> room_ptr, const std::vector<Card>& cards) 
         send_error(room_ptr->players[player_idx]->hdl, 1004, "invalid_play");
         return;
     }
-
+    for(const Card &d : cards){
+        if(d.num==Card::TWO&&d.suit==Card::HERAT)room_ptr->players[player_idx]->public_identity+=2;
+        if(d.num==Card::KING&&d.suit==Card::SPADE)room_ptr->players[player_idx]->public_identity+=1;
+    }
     room_ptr->pass_count = 0;
 
     json result_msg{
