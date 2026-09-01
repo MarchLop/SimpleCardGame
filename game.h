@@ -196,24 +196,19 @@ class Game{// note who host outside
 
         int round(const std::vector<Card>& play){// 0:error 1:continue 2:player_over 确保牌按格式传进来
             if(!check(play))return 0;
-            
-            if(players[nowplayer]->PlayCard(play)){
-                if(card_in_table.first!=CardsType::INVALID){
-                    card_in_table={tell_type(play),play};
-                }
-                over_num++;
-                do{
-                nowplayer++;
-                nowplayer%=4;
-                }while(players[nowplayer]->over);
-                return 2;
-            }
+            size_t before = players[nowplayer]->GetHand().size();
+            bool finished = players[nowplayer]->PlayCard(play);
+            if(players[nowplayer]->GetHand().size() == before) return 0;
+
             card_in_table={tell_type(play),play};
+            if(finished){
+                over_num++;
+            }
             do{
                 nowplayer++;
                 nowplayer%=4;
             }while(players[nowplayer]->over);
-            return 1;
+            return finished ? 2 : 1;
         }
 
         bool check(const std::vector<Card>& play){
@@ -256,6 +251,16 @@ class Game{// note who host outside
         void table_clear(){//when host==nowplayer
             card_in_table.first=CardsType::INVALID;
             turn++;
+        }
+
+        void reset(){
+            players.clear();
+            status = 0;
+            over_num = 0;
+            nowplayer = tt() % 4;
+            turn = 0;
+            table_clear();
+            deck = Deck();
         }
     public:
         std::vector<std::shared_ptr<GamePlayer>> players;

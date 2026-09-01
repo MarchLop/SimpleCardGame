@@ -43,7 +43,7 @@ struct GameAction {
 
 struct Room {
     Room(int i, websocketpp::lib::asio::io_context& ios)
-        : id(i), started(false), current_turn(0), pass_count(0), turn_timer(ios) {}
+        : id(i), started(false), current_turn(0), pass_count(0), last_player(0), turn_timer(ios) {}
 
     int id;
     Game game;
@@ -52,6 +52,8 @@ struct Room {
     bool started;
     int current_turn;
     int pass_count;
+    int last_player; // 1-based player_id of last successful play, 0 if table is clear
+    std::vector<int> ranking;
     websocketpp::lib::asio::steady_timer turn_timer;
 };
 
@@ -77,7 +79,10 @@ std::string romdom_token(){
 // 广播给房间所有人
 void broadcast(Room& room, const std::string& msg) {
     for (auto& p : room.players) {
-        ws_server.send(p->hdl, msg, websocketpp::frame::opcode::text);
+        try {
+            if(p->hdl.expired()) continue;
+            ws_server.send(p->hdl, msg, websocketpp::frame::opcode::text);
+        } catch(...) {}
     }
 }
 
@@ -137,7 +142,7 @@ void send_your_turn(std::shared_ptr<Room> room_ptr) {
         for(const auto &card : room_ptr->game.card_in_table.second){
             last_play.push_back({{"num", card.num}, {"suit", card.suit}});
         }
-        last_player = ((room_ptr->current_turn + static_cast<int>(room_ptr->players.size()) - 1) % static_cast<int>(room_ptr->players.size())) + 1;
+        last_player = room_ptr->last_player;
     }
     json msg{
         {"type","your_turn"},
@@ -157,14 +162,22 @@ void send_your_turn(std::shared_ptr<Room> room_ptr) {
         {"is_free", is_free_turn(*room_ptr)}
     };
     int now=0;
-    for(auto player : room_ptr->players){
+    for(auto p : room_ptr->players){
+        auto gp_it = room_ptr->player_map.find(p);
+        int hand_size = 0;
+        bool is_over = false;
+        if(gp_it != room_ptr->player_map.end() && gp_it->second){
+            hand_size = (int)gp_it->second->GetHand().size();
+            is_over = gp_it->second->over;
+        }
         msgb["player_status"].push_back({
             {"player_id", ++now},
-            {"playerhand_size",room_ptr->player_map[player]->GetHand().size()},
-            {"player_public_identity",player->public_identity},
-            {"is_over",room_ptr->player_map[player]->over}
+            {"playerhand_size", hand_size},
+            {"player_public_identity", p->public_identity},
+            {"is_over", is_over}
         });
     }
+    broadcast(*room_ptr, msgb.dump());
 }
 
 void start_next_turn(std::shared_ptr<Room> room_ptr);
@@ -184,6 +197,7 @@ void apply_timeout(std::shared_ptr<Room> room_ptr) {
     if(room_ptr->pass_count >= 3){
         room_ptr->game.table_clear();
         room_ptr->pass_count = 0;
+        room_ptr->last_player = 0;
     }
 
     json msg{
@@ -200,15 +214,22 @@ bool check_game_over(std::shared_ptr<Room> room_ptr) {
     return room_ptr->game.over_num >= 3;
 }
 
+void fill_remaining_ranking(std::shared_ptr<Room> room_ptr) {
+    for(int i = 0; i < (int)room_ptr->players.size(); ++i){
+        int pid = i + 1;
+        if(std::find(room_ptr->ranking.begin(), room_ptr->ranking.end(), pid) == room_ptr->ranking.end()){
+            room_ptr->ranking.push_back(pid);
+        }
+    }
+}
+
 void broadcast_game_over(std::shared_ptr<Room> room_ptr) {
+    fill_remaining_ranking(room_ptr);
     json msg{
         {"type","game_over"},
         {"room_id", room_ptr->id},
-        {"ranking", json::array()}
+        {"ranking", room_ptr->ranking}
     };
-    for(int i=0;i<4;i++){
-        msg["ranking"].push_back(i+1);
-    }
     broadcast(*room_ptr, msg.dump());
 }
 
@@ -225,6 +246,7 @@ void apply_play(std::shared_ptr<Room> room_ptr, const std::vector<Card>& cards) 
         if(d.num==Card::KING&&d.suit==Card::SPADE)room_ptr->players[player_idx]->public_identity+=1;
     }
     room_ptr->pass_count = 0;
+    room_ptr->last_player = player_idx + 1;
 
     json result_msg{
         {"type","play_result"},
@@ -240,6 +262,7 @@ void apply_play(std::shared_ptr<Room> room_ptr, const std::vector<Card>& cards) 
     broadcast(*room_ptr, result_msg.dump());
 
     if(result == 2){
+        room_ptr->ranking.push_back(player_idx + 1);
         json finish_msg{
             {"type","player_finish"},
             {"room_id", room_ptr->id},
@@ -268,6 +291,7 @@ void apply_pass(std::shared_ptr<Room> room_ptr) {
     if(room_ptr->pass_count >= 3){
         room_ptr->game.table_clear();
         room_ptr->pass_count = 0;
+        room_ptr->last_player = 0;
     }
 
     json msg{
@@ -306,7 +330,7 @@ void process_action(std::shared_ptr<Room> room_ptr, GameAction action) {
 void start_next_turn(std::shared_ptr<Room> room_ptr) {
     if (!room_ptr->started || room_ptr->players.empty()) return;
     send_your_turn(room_ptr);
-    room_ptr->turn_timer.expires_after(std::chrono::seconds(15));
+    room_ptr->turn_timer.expires_after(std::chrono::seconds(30));
     room_ptr->turn_timer.async_wait([room_ptr](const websocketpp::lib::error_code& ec) {
         if (ec) return;
         process_action(room_ptr, GameAction{GameActionType::TIMEOUT, room_ptr->players[room_ptr->current_turn], {}});
@@ -335,7 +359,8 @@ std::unordered_map<std::string,int> ty=
 {"play",6},
 {"pass",7},
 {"get_rooms",8},
-{"player_list",9}
+{"player_list",9},
+{"chat",10}
 };
 
 std::shared_ptr<Room> find_room_by_player(Player* player) {
@@ -347,8 +372,66 @@ std::shared_ptr<Room> find_room_by_player(Player* player) {
     return nullptr;
 }
 
+std::shared_ptr<Room> find_room_by_id(int room_id) {
+    for (auto &room_ptr : rooms) {
+        if (room_ptr->id == room_id) return room_ptr;
+    }
+    return nullptr;
+}
+
+void send_player_list(connection_hdl hdl, Room& room) {
+    json msgs{
+        {"type","player_list"},
+        {"room_id", room.id},
+        {"players", json::array()}
+    };
+    for(size_t idx = 0; idx < room.players.size(); ++idx){
+        Player* player = room.players[idx];
+        msgs["players"].push_back({
+            {"player_id", (int)idx + 1},
+            {"player_name", player->name},
+            {"ready", player->ready}
+        });
+    }
+    ws_server.send(hdl, msgs.dump(), websocketpp::frame::opcode::text);
+}
+
+void send_room_joined(connection_hdl hdl, Room& room, Player* player) {
+    json msgs{
+        {"type","room_joined"},
+        {"room_id", room.id},
+        {"player_id", get_player_index(room, player)},
+        {"player_count", (int)room.players.size()},
+        {"max_players", 4},
+        {"started", room.started}
+    };
+    ws_server.send(hdl, msgs.dump(), websocketpp::frame::opcode::text);
+}
+
+void send_game_snapshot(connection_hdl hdl, Room& room, Player* player) {
+    auto gp_it = room.player_map.find(player);
+    if(gp_it == room.player_map.end()) return;
+    json start_msg{
+        {"type","game_start"},
+        {"room_id", room.id},
+        {"hand", json::array()},
+        {"identity", gp_it->second->identity},
+        {"first_turn", room.game.nowplayer + 1}
+    };
+    for(const auto &card : gp_it->second->GetHand()){
+        start_msg["hand"].push_back({{"num", card.num}, {"suit", card.suit}});
+    }
+    ws_server.send(hdl, start_msg.dump(), websocketpp::frame::opcode::text);
+}
+
 void on_message(connection_hdl hdl, server::message_ptr msg) {
-    json j=json::parse(msg->get_payload());
+    json j;
+    try {
+        j = json::parse(msg->get_payload());
+    } catch(...) {
+        send_error(hdl, 300, "invalid_json");
+        return;
+    }
     if(!j.contains("type"))return;
     std::string type=j.at("type").get<std::string>();
     auto it_type=ty.find(type);
@@ -406,6 +489,8 @@ void on_message(connection_hdl hdl, server::message_ptr msg) {
             
             if(itp == hdl_to_players.end()){send_error(hdl,201,"not_authed");break;}
 
+            if(find_room_by_player(itp->second)){send_error(hdl,304,"already_in_room");break;}
+
             if((int)rooms.size() >= 10){send_error(hdl,202,"max_rooms");break;}
 
             rooms.emplace_back(std::make_shared<Room>(next_room_id, ws_server.get_io_context()));
@@ -436,29 +521,28 @@ void on_message(connection_hdl hdl, server::message_ptr msg) {
             if(itp == hdl_to_players.end()){send_error(hdl,301,"not_authed");break;}
 
             int roomid = j.value("room_id", 0);
-            if(roomid <= 0 || roomid > (int)rooms.size()){send_error(hdl,302,"no_found_room");break;}
+            auto room_ptr = find_room_by_id(roomid);
+            if(!room_ptr){send_error(hdl,302,"no_found_room");break;}
 
-            auto room_ptr = rooms[roomid - 1];
             Room &room = *room_ptr;
+            Player* player = itp->second;
+            auto existing = find_room_by_player(player);
+            if(existing){
+                if(existing->id != roomid){
+                    send_error(hdl,304,"already_in_room");
+                    break;
+                }
+                send_room_joined(hdl, room, player);
+                send_player_list(hdl, room);
+                if(room.started) send_game_snapshot(hdl, room, player);
+                break;
+            }
+            if(room.started){send_error(hdl,306,"game_already_started");break;}
             if(room.players.size() == 4){send_error(hdl,303,"rooms_player_enough");break;}
 
-            if(std::find(room.players.begin(), room.players.end(), itp->second) != room.players.end()){
-                send_error(hdl,304,"already_in_room");break;
-            }
-
-            room.players.push_back(itp->second);
-            // ensure ready flag is cleared when a player joins
-            itp->second->ready = false;
-          //  room.player_map[itp->second] = room.game.AddPlayer();
-            json msgs{
-                {"type","room_joined"},
-                {"room_id",roomid},
-                {"player_id",(int)room.players.size()},
-                {"player_count",(int)room.players.size()},
-                {"max_players",4},
-                {"started",false}
-            };
-            ws_server.send(hdl,msgs.dump(),websocketpp::frame::opcode::text);
+            room.players.push_back(player);
+            player->ready = false;
+            send_room_joined(hdl, room, player);
             json bmsg{
                 {"type","player_joined"},
                 {"player_id",(int)room.players.size()},
@@ -517,16 +601,6 @@ void on_message(connection_hdl hdl, server::message_ptr msg) {
             }
             player->ready = true;
             int ready_count = std::count_if(room.players.begin(), room.players.end(), [](Player* p){ return p->ready; });
-            // Debug: print ready states for diagnosis
-            std::cerr << "[ready-debug] room=" << room.id << " ready_count=" << ready_count << " players=" << room.players.size() << "\n";
-            for(size_t ii=0; ii<room.players.size(); ++ii){
-                Player* pp = room.players[ii];
-                if(pp){
-                    std::cerr << "  slot=" << ii+1 << " name='" << pp->name << "' ready=" << pp->ready << "\n";
-                } else {
-                    std::cerr << "  slot=" << ii+1 << " <empty>\n";
-                }
-            }
             int player_id = get_player_index(room, player);
             json ready_msg{
                 {"type","player_ready"},
@@ -544,40 +618,28 @@ void on_message(connection_hdl hdl, server::message_ptr msg) {
             };
             ws_server.send(hdl, ack.dump(), websocketpp::frame::opcode::text);
             broadcast(room, ready_msg.dump());
-            std::cerr<<(int)room.players.size()<<"players"<<std::endl; 
             if(ready_count == (int)room.players.size() && room.players.size() == 4){
-                std::cerr << "[ready-debug] all ready met, scheduling game_start for room=" << room.id << "\n";
-
                 auto room_shared = room_ptr;
-                for(auto player:room_ptr->players){
-                    room_ptr->player_map[player]=room_ptr->game.AddPlayer();
+                room_ptr->game.reset();
+                room_ptr->player_map.clear();
+                room_ptr->ranking.clear();
+                room_ptr->last_player = 0;
+                room_ptr->pass_count = 0;
+                for(auto p : room_ptr->players){
+                    p->public_identity = 0;
+                    room_ptr->player_map[p] = room_ptr->game.AddPlayer();
                 }
                 websocketpp::lib::asio::post(ws_server.get_io_context(), [room_shared](){
                     Room &r = *room_shared;
-                    std::cerr << "[ready-debug] running scheduled game_start for room=" << r.id << " players=" << r.players.size() << " game.players=" << r.game.players.size() << " status=" << r.game.status << " started=" << r.started << "\n";
-                    if(!all_ready(r)) {
-                        std::cerr << "[ready-debug] abort game_start: not all_ready\n";
-                        return;
-                    }
-                    if((int)r.players.size() != 4) {
-                        std::cerr << "[ready-debug] abort game_start: wrong player count=" << r.players.size() << "\n";
-                        return;
-                    }
-                    if(r.started) {
-                        std::cerr << "[ready-debug] abort game_start: already started\n";
-                        return;
-                    }
-                    std::cerr << "[ready-debug] invoking Game::gamestart()\n";
+                    if(!all_ready(r)) return;
+                    if((int)r.players.size() != 4) return;
+                    if(r.started) return;
                     if(!r.game.status && r.game.gamestart()){
-                        std::cerr << "[ready-debug] game_start succeeded, sending to players\n";
                         r.started = true;
                         r.current_turn = r.game.nowplayer;
                         for(auto &p : r.players){
                             auto gp_it2 = r.player_map.find(p);
-                            if(gp_it2 == r.player_map.end()) {
-                                std::cerr << "[ready-debug] missing player_map entry for player in room=" << r.id << "\n";
-                                continue;
-                            }
+                            if(gp_it2 == r.player_map.end()) continue;
                             json start_msg{
                                 {"type","game_start"},
                                 {"room_id", r.id},
@@ -591,12 +653,9 @@ void on_message(connection_hdl hdl, server::message_ptr msg) {
                                     {"suit", card.suit}
                                 });
                             }
-                            std::cerr << "[ready-debug] sending game_start to player_id=" << (get_player_index(r, p)) << "\n";
                             ws_server.send(p->hdl, start_msg.dump(), websocketpp::frame::opcode::text);
                         }
                         start_next_turn(room_shared);
-                    } else {
-                        std::cerr << "[ready-debug] abort game_start: gamestart() false or already status=" << r.game.status << "\n";
                     }
                 });
             }
@@ -725,27 +784,62 @@ void on_message(connection_hdl hdl, server::message_ptr msg) {
             ws_server.send(hdl,msgs.dump(),websocketpp::frame::opcode::text);
             break;
         }
+        case 10:{
+            auto itp = hdl_to_players.find(hdl);
+            if(itp == hdl_to_players.end()){
+                send_error(hdl, 101, "not_authed");
+                break;
+            }
+            Player* player = itp->second;
+            auto room_ptr = find_room_by_player(player);
+            if(!room_ptr){
+                send_error(hdl, 305, "not_in_room");
+                break;
+            }
+            std::string text = j.value("text", std::string());
+            if(text.empty()){
+                send_error(hdl, 300, "none_content");
+                break;
+            }
+            int player_id = get_player_index(*room_ptr, player);
+            if(text.empty() || text.size() > 200) break;
+            json chat_msg{
+                {"type","chat"},
+                {"room_id", room_ptr->id},
+                {"player_id", player_id},
+                {"player_name", player->name},
+                {"text", text}
+            };
+            broadcast(*room_ptr, chat_msg.dump());
+            break;
+        }
     }
 }
 
 // 断开连接
 void on_close(connection_hdl hdl) {
     auto it = hdl_to_players.find(hdl);
-    if(it != hdl_to_players.end()){
-        Player* p = it->second;
-        // 从所有房间移除该玩家指针
-        for(auto &room_ptr : rooms){
-            room_ptr->players.erase(std::remove(room_ptr->players.begin(), room_ptr->players.end(), p), room_ptr->players.end());
-        }
-        // 重置 auth_players 中对应玩家的 hdl（保留 token）
-        for(auto &kv : auth_players){
-            if(&kv.second == p){
-                kv.second.hdl = connection_hdl();
-                kv.second.ready = false;
-                break;
-            }
-        }
+    if (it == hdl_to_players.end()) return;
+    Player* p = it->second;
+    // A reconnect may have already replaced this player's connection. Do not let
+    // the old socket's close event disconnect the new socket.
+    std::owner_less<connection_hdl> less;
+    if (p->hdl.lock() && (less(p->hdl, hdl) || less(hdl, p->hdl))) {
         hdl_to_players.erase(it);
+        return;
+    }
+    // Keep the player in the room. The saved token can reconnect to the same seat.
+    p->hdl = connection_hdl();
+    for (auto& room : rooms) {
+        if (!room->started && std::find(room->players.begin(), room->players.end(), p) != room->players.end())
+            p->ready = false;
+    }
+    hdl_to_players.erase(it);
+    for (auto& room : rooms) {
+        if (std::find(room->players.begin(), room->players.end(), p) != room->players.end()) {
+            json msg{{"type","player_connection"},{"room_id",room->id},{"player_id",get_player_index(*room,p)},{"connected",false}};
+            broadcast(*room,msg.dump());
+        }
     }
 }
 

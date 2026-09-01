@@ -7,33 +7,39 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="app">
-        <!-- 连接状态 -->
-        <div id="status-bar">
-            <span id="status-dot" class="dot-offline"></span>
-            <span id="status-text">未连接</span>
-        </div>
+    <div id="app" class="page-shell">
+        <header class="topbar">
+            <div>
+                <div class="title">SimpleCardGame</div>
+                <div class="subtitle">快速加入房间，和好友一起开局</div>
+            </div>
+            <div class="status-pill">
+                <span id="status-dot" class="dot-offline"></span>
+                <span id="status-text">未连接</span>
+            </div>
+        </header>
 
-        <!-- 昵称设置（始终显示） -->
-        <div id="nick-section" class="section">
-            <h1>SimpleCardGame</h1>
+        <section class="panel">
+            <div class="panel-header">
+                <span>昵称设置</span>
+                <span class="hint">昵称会在游戏内显示</span>
+            </div>
             <div class="input-group">
-                <label>昵称</label>
+                <label for="nick-input">昵称</label>
                 <input type="text" id="nick-input" maxlength="10" placeholder="输入昵称">
-                <button id="save-nick-btn">保存</button>
+                <button id="save-nick-btn" class="btn-primary">保存</button>
             </div>
-        </div>
+        </section>
 
-        <!-- 房间列表（连接后显示） -->
-        <div id="lobby-section" class="section hidden">
-            <div class="section-header">
-                <h2>房间列表</h2>
-                <button id="create-room-btn" class="btn-primary">+ 创建房间</button>
+        <section id="lobby-section" class="panel hidden">
+            <div class="panel-header">
+                <span>房间列表</span>
+                <button id="create-room-btn" class="btn-primary">创建房间</button>
             </div>
-            <div id="room-list">
+            <div id="room-list" class="room-list">
                 <div class="empty-msg">暂无房间，点击上方创建</div>
             </div>
-        </div>
+        </section>
     </div>
 
     <script src="ws.js"></script>
