@@ -11,6 +11,7 @@ document.getElementById("room-id").textContent = roomId;
 const POS = ["bottom", "right", "top", "left"];
 
 const dom = {
+    handCount: document.getElementById("hand-count"),
     statusText: document.getElementById("game-status-text"),
     lastPlayArea: document.getElementById("last-play-area"),
     turnHint: document.getElementById("turn-hint"),
@@ -27,6 +28,7 @@ const dom = {
 };
 
 let selectedCards = [];
+let myIdentity = 0;
 let turnTimer = null;
 let turnSeconds = 30;
 
@@ -42,34 +44,37 @@ function loadNick() {
 }
 
 function updatePlayers() {
-    for (let i = 0; i < 4; i++) {
-        const pos = POS[i];
-        const el = document.getElementById("player-" + pos);
+    for (let seat = 0; seat < 4; seat++) {
+        const pos = POS[seat], el = document.getElementById("player-" + pos);
         if (!el) continue;
-        const p = roomPlayers[i];
-        const nameEl = el.querySelector(".player-name");
-        const statusEl = el.querySelector(".player-status");
-        const leftEl = el.querySelector(".player-cards-left");
+        const globalIdx = myPlayerId ? ((myPlayerId - 1 + seat) % 4) : seat;
+        const p = roomPlayers[globalIdx];
+        const nameEl = el.querySelector(".player-name"), statusEl = el.querySelector(".player-status"), leftEl = el.querySelector(".player-cards-left"), identityEl = el.querySelector(".player-identity");
         if (p) {
+            const avatarEl = el.querySelector(".avatar");
+            if (avatarEl) avatarEl.textContent = p.isMe ? "我" : ((p.name || `玩家${p.id}`).trim().charAt(0) || "?");
             nameEl.textContent = p.name || `玩家${p.id}`;
-            if (p.finished) {
-                statusEl.textContent = "出完";
-                el.classList.add("player-finished");
-            } else {
-                statusEl.textContent = p.ready ? "✓" : "";
-                el.classList.remove("player-finished");
-            }
-            leftEl.textContent = p.cardsLeft != null ? `${p.cardsLeft}张` : "";
-            el.classList.toggle("player-active", p.isActive);
-            nameEl.style.color = p.isMe ? "#ffd700" : "";
+            statusEl.textContent = p.actionState === "出牌中" ? "● 出牌中" :
+                (p.actionState === "出牌" ? "● 已出牌" :
+                (p.actionState === "PASS" ? "PASS" :
+                (p.actionState === "超时" ? "⌛ 超时" :
+                (p.ready ? "✓ 已准备" : (p.connected === false ? "断线" : "等待")))));
+            leftEl.textContent = p.cardsLeft != null ? `${p.cardsLeft} 张` : "";
+            if (identityEl) identityEl.textContent = p.publicIdentity ? identityText(p.publicIdentity) : "";
+            el.classList.toggle("player-active", !!p.isActive);
+            el.classList.toggle("player-disconnected", p.connected === false);
+            el.classList.toggle("player-me", !!p.isMe);
         } else {
-            nameEl.textContent = "-";
-            statusEl.textContent = "";
-            leftEl.textContent = "";
-            el.classList.remove("player-active");
+            const avatarEl = el.querySelector(".avatar");
+            if (avatarEl) avatarEl.textContent = "?";
+            nameEl.textContent = "-"; statusEl.textContent = ""; leftEl.textContent = "";
+            if (identityEl) identityEl.textContent = "";
+            el.classList.remove("player-active", "player-disconnected", "player-me");
         }
     }
 }
+function identityText(v) { return v === 3 ? "♠K + ♥2" : v === 1 ? "♠K队" : v === 2 ? "♥2队" : ""; }
+function playerById(id) { return roomPlayers.find(p => p && p.id === id) || null; }
 
 // ===== 房间事件 =====
 window.onRoomJoined = function(msg) {
@@ -95,6 +100,9 @@ window.onRoomJoined = function(msg) {
     }
 };
 
+// 创建者也走同一套房间初始化逻辑，否则创建房间后不会出现准备按钮。
+window.onRoomCreated = function(msg) { window.onRoomJoined(msg); };
+
 window.onPlayerJoined = function(msg) {
     const idx = msg.player_id - 1;  // player_id 1→bottom, 2→right, 3→top, 4→left
     if (idx < 0 || idx >= 4) return;
@@ -107,14 +115,8 @@ window.onPlayerJoined = function(msg) {
     dom.statusText.textContent = `等待中 (${msg.player_count}/4)`;
 };
 
-window.onPlayerLeft = function(msg) {
-    // 清除对应槽位
-    const idx = msg.player_id - 1;
-    if (idx >= 0 && idx < roomPlayers.length) {
-        roomPlayers[idx] = null;
-    }
-    updatePlayers();
-};
+window.onPlayerLeft = function(msg) { const idx = msg.player_id - 1; if (idx >= 0 && idx < roomPlayers.length) roomPlayers[idx] = null; updatePlayers(); };
+window.onPlayerConnection = function(msg) { const p = playerById(msg.player_id); if (p) p.connected = !!msg.connected; updatePlayers(); };
 
 // 离开房间确认
 window.onLeaveRoomOk = function(msg) {
@@ -146,6 +148,7 @@ window.onPlayerList = function(msg) {
                     id: player.player_id,
                     name: player.player_name || `玩家${player.player_id}`,
                     ready: !!player.ready,
+                    connected: player.connected !== false,
                     isMe: player.player_id === myPlayerId
                 };
             }
@@ -186,71 +189,48 @@ window.onGameStart = function(msg) {
 };
 
 // ===== 轮到谁 =====
-function startTurnTimer() {
-    if (turnTimer) clearInterval(turnTimer);
-    turnSeconds = 30;
-    const hintEl = document.getElementById("turn-hint");
-    if (hintEl) {
-        hintEl.textContent = hintEl.textContent.split("(")[0].trim() + " (" + turnSeconds + "s)";
-    }
+function startTurnTimer(seconds = 30) {
+    stopTurnTimer(); turnSeconds = Math.max(1, Number(seconds) || 30); renderTimer();
     turnTimer = setInterval(() => {
         turnSeconds--;
-        if (hintEl) {
-            const base = hintEl.textContent.replace(/\(\d+s\)/, "").trim() || "轮到你了";
-            hintEl.textContent = base + " (" + turnSeconds + "s)";
-        }
+        renderTimer();
         if (turnSeconds <= 0) {
-            clearInterval(turnTimer);
-            turnTimer = null;
-            // 超时自动过牌
-            send({ type: "pass" });
+            stopTurnTimer();
             dom.handActions.classList.add("hidden");
+            selectedCards = [];
+            renderHand();
+            dom.turnHint.textContent = "操作超时，等待服务器自动过牌…";
         }
     }, 1000);
 }
-
-function stopTurnTimer() {
-    if (turnTimer) {
-        clearInterval(turnTimer);
-        turnTimer = null;
-    }
-}
+function renderTimer() { const el = document.getElementById("turn-timer"); if (el) el.textContent = `${Math.max(0, turnSeconds)}s`; }
+function stopTurnTimer() { if (turnTimer) clearInterval(turnTimer); turnTimer = null; const el=document.getElementById("turn-timer"); if(el) el.textContent="--"; }
 
 window.onYourTurn = function(msg) {
-    console.log('[game] onYourTurn', msg);
     stopTurnTimer();
-    roomPlayers.forEach(p => { if (p) p.isActive = (p.id === msg.player_id); });
-    updatePlayers();
+    const current = Number(msg.player_id);
+    roomPlayers.forEach(p => {
+        if (!p) return;
+        p.isActive = p.id === current;
+        if (p.id === current) p.actionState = "出牌中";
+    });
 
-    // 如果是自由出牌（清牌桌），清除所有玩家的出牌区
+    renderCenterPlay(msg.last_play || [], msg.last_player || 0);
     if (msg.is_free) {
-        for (let i = 0; i < 4; i++) {
-            const pos = POS[i];
-            const el = document.querySelector("#player-" + pos + " .player-played");
-            if (el) el.innerHTML = "";
-        }
-        dom.passBtn.disabled = true;   // 自由出牌：不能过牌
-    } else {
-        dom.passBtn.disabled = false;  // 非自由出牌：恢复过牌按钮
+        clearCenterPlay();
     }
 
-    if (msg.last_play && msg.last_play.length > 0) {
-        dom.lastPlayArea.innerHTML = msg.last_play.map(c =>
-            `<img src="${cardImg(c.num, c.suit)}" alt="card">`
-        ).join("");
-    } else {
-        dom.lastPlayArea.innerHTML = "";
-    }
-
+    updatePlayers();
     if (msg.player_id === myPlayerId) {
         dom.turnHint.textContent = msg.is_free ? "自由出牌" : "轮到你了";
         dom.handActions.classList.remove("hidden");
-        startTurnTimer();
+        dom.playBtn.disabled = false;
+        dom.passBtn.disabled = !!msg.is_free;
+        startTurnTimer(msg.timeout || 30);
     } else {
-        const p = roomPlayers.find(x => x && x.id === msg.player_id);
-        dom.turnHint.textContent = `等待 ${p ? p.name : '对方'} 出牌...`;
+        const p = playerById(msg.player_id);
+        dom.turnHint.textContent = `等待 ${p ? p.name : "对方"} 出牌...`;
         dom.handActions.classList.add("hidden");
-        stopTurnTimer();
     }
 };
 
@@ -258,6 +238,7 @@ let myPlayerId = null;
 
 // ===== 手牌渲染 =====
 function renderHand() {
+    if (dom.handCount) dom.handCount.textContent = `${myHand.length} 张`;
     dom.handCards.innerHTML = myHand.map((c, i) => {
         const sel = selectedCards.includes(i) ? "selected" : "";
         return `<img src="${cardImg(c.num, c.suit)}" class="${sel}" data-idx="${i}" alt="card">`;
@@ -279,6 +260,7 @@ dom.playBtn.addEventListener("click", () => {
     if (selectedCards.length === 0) return;
     const cards = selectedCards.map(i => myHand[i]);
     send({ type: "play", cards: cards });
+    dom.handActions.classList.add("hidden");
     selectedCards = [];
 });
 
@@ -291,6 +273,12 @@ dom.passBtn.addEventListener("click", () => {
 // ===== 出牌结果 =====
 window.onPlayResult = function(msg) {
     stopTurnTimer();
+    const p = playerById(msg.player_id);
+    if (p) {
+        p.actionState = "出牌";
+        p.isActive = false;
+        p.cardsLeft = msg.cards_left;
+    }
     if (msg.player_id === myPlayerId) {
         msg.cards.forEach(c => {
             const idx = myHand.findIndex(h => h.num === c.num && h.suit === c.suit);
@@ -299,65 +287,57 @@ window.onPlayResult = function(msg) {
         renderHand();
         dom.handActions.classList.add("hidden");
     }
-    showPlayedCards(msg.player_id, msg.cards);
-    dom.lastPlayArea.innerHTML = msg.cards.map(c =>
-        `<img src="${cardImg(c.num, c.suit)}" alt="card">`
-    ).join("");
-    const p = roomPlayers.find(x => x && x.id === msg.player_id);
-    if (p) p.cardsLeft = msg.cards_left;
+    renderCenterPlay(msg.cards || [], msg.player_id, p ? p.name : `玩家${msg.player_id}`);
+    dom.turnHint.textContent = `${p ? p.name : "玩家"} 出牌`;
     updatePlayers();
-    dom.turnHint.textContent = "";
-};
-
-window.onPlayInvalid = function(msg) {
-    // 后端没有 play_invalid type，通过 error 处理
-    // 此函数保留但不再由 ws.js 分发
 };
 
 window.onPlayerPass = function(msg) {
     stopTurnTimer();
-    dom.turnHint.textContent = "";
-    showPlayedCards(msg.player_id, []);
+    const p = playerById(msg.player_id);
+    if (p) {
+        p.actionState = msg.timeout ? "超时" : "PASS";
+        p.isActive = false;
+    }
+    if (msg.player_id === myPlayerId) {
+        selectedCards = [];
+        dom.handActions.classList.add("hidden");
+    }
+    if (msg.table_cleared) clearCenterPlay();
+    const text = msg.timeout ? "超时，自动过牌" : "PASS";
+    dom.turnHint.textContent = `${p ? p.name : "玩家"}：${text}`;
+    updatePlayers();
 };
 
 window.onPlayerFinish = function(msg) {
-    const p = roomPlayers.find(x => x && x.id === msg.player_id);
+    const p = playerById(msg.player_id);
+    if (p) {
+        p.actionState = `第 ${msg.rank} 名`;
+        p.finished = true;
+    }
     dom.turnHint.textContent = `${p ? p.name : '玩家'} 出完了！第 ${msg.rank} 名`;
+    updatePlayers();
 };
 
 window.onTableStatus = function(msg) {
     console.log('[game] onTableStatus', msg);
-    if (msg.player_status) {
+    // table_status 是全员同步状态，不能让所有客户端都启动自己的倒计时。
+    // 只有收到 your_turn 的客户端才启动本地计时器。
+    if (Array.isArray(msg.player_status)) {
         for (const ps of msg.player_status) {
-            const p = roomPlayers.find(x => x && x.id === ps.player_id);
-            if (p) {
-                p.cardsLeft = ps.playerhand_size;
-                // 身份标记通过局内可见性显示（不显示具体身份）
-                if (ps.player_public_identity) {
-                    p.publicIdentity = ps.player_public_identity;
-                }
-                if (ps.is_over) {
-                    p.finished = true;
-                }
-            }
+            const p = playerById(ps.player_id);
+            if (!p) continue;
+            p.cardsLeft = ps.playerhand_size;
+            p.publicIdentity = ps.player_public_identity || 0;
+            p.connected = ps.is_connected !== false;
+            p.isActive = ps.player_id === msg.current_player;
+            p.actionState = ps.action_state || (p.isActive ? "出牌中" : "等待");
+            p.finished = !!ps.is_over;
         }
         updatePlayers();
     }
-    // 当前出牌玩家（1-based）→ 高亮座位 + "等待 XX 出牌..." 提示
-    if (msg.current_player) {
-        roomPlayers.forEach(p => { if (p) p.isActive = (p.id === msg.current_player); });
-        const cur = roomPlayers.find(x => x && x.id === msg.current_player);
-        dom.turnHint.textContent = `等待 ${cur ? cur.name : '对方'} 出牌...`;
-        updatePlayers();
-    }
-    // 牌桌显示
-    if (msg.last_play && msg.last_play.length > 0) {
-        dom.lastPlayArea.innerHTML = msg.last_play.map(c =>
-            `<img src="${cardImg(c.num, c.suit)}" alt="card">`
-        ).join("");
-    } else {
-        dom.lastPlayArea.innerHTML = "";
-    }
+    if (msg.is_free) clearCenterPlay();
+    else renderCenterPlay(msg.last_play || [], msg.last_player || 0);
 };
 
 window.onGameOver = function(msg) {
@@ -392,20 +372,27 @@ window.onChatMsg = function(msg) {
     dom.chatMsgs.scrollTop = dom.chatMsgs.scrollHeight;
 };
 
-function showPlayedCards(playerId, cards) {
-    const idx = roomPlayers.findIndex(p => p && p.id === playerId);
-    if (idx < 0 || idx >= 4) return;
-    const pos = POS[idx];
-    const playedEl = document.querySelector("#player-" + pos + " .player-played");
-    if (!playedEl) return;
-    playedEl.innerHTML = cards.map(c =>
-        '<img src="' + cardImg(c.num, c.suit) + '" alt="card">'
-    ).join("");
-    // 更新手牌数
-    const p = roomPlayers[idx];
-    if (p && cards.length > 0) {
-        // 不在这里减手牌，只在 play_result 里处理
+function clearCenterPlay() {
+    dom.lastPlayArea.innerHTML = "";
+    const who = document.getElementById("last-play-player");
+    if (who) who.textContent = "等待出牌";
+    const hint = document.querySelector(".center-empty-hint");
+    if (hint) hint.classList.remove("hidden");
+}
+
+function renderCenterPlay(cards, playerId, playerName) {
+    if (!cards || !cards.length) {
+        clearCenterPlay();
+        return;
     }
+    dom.lastPlayArea.innerHTML = cards.map(c =>
+        `<img src="${cardImg(c.num, c.suit)}" alt="card">`
+    ).join("");
+    const p = playerById(Number(playerId));
+    const who = document.getElementById("last-play-player");
+    if (who) who.textContent = `${playerName || (p ? p.name : `玩家${playerId}`)} 出牌`;
+    const hint = document.querySelector(".center-empty-hint");
+    if (hint) hint.classList.add("hidden");
 }
 
 function showToast(message, type) {
@@ -428,7 +415,11 @@ dom.leaveBtn.addEventListener("click", () => {
 
 window.onError = function(msg) {
     if (msg.code === 1004 || msg.message === "invalid_play") {
-        showToast(msg.message || "不合法的牌型", "error");
+        showToast("不能这样出牌", "error");
+        return;
+    }
+    if (msg.code === 1005) {
+        showToast("自由出牌时不能 PASS", "error");
         return;
     }
     if (msg.code === 302 || msg.code === 306) {
