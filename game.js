@@ -52,7 +52,13 @@ function updatePlayers() {
         const leftEl = el.querySelector(".player-cards-left");
         if (p) {
             nameEl.textContent = p.name || `玩家${p.id}`;
-            statusEl.textContent = p.ready ? "✓" : "";
+            if (p.finished) {
+                statusEl.textContent = "出完";
+                el.classList.add("player-finished");
+            } else {
+                statusEl.textContent = p.ready ? "✓" : "";
+                el.classList.remove("player-finished");
+            }
             leftEl.textContent = p.cardsLeft != null ? `${p.cardsLeft}张` : "";
             el.classList.toggle("player-active", p.isActive);
             nameEl.style.color = p.isMe ? "#ffd700" : "";
@@ -219,6 +225,9 @@ window.onYourTurn = function(msg) {
             const el = document.querySelector("#player-" + pos + " .player-played");
             if (el) el.innerHTML = "";
         }
+        dom.passBtn.disabled = true;   // 自由出牌：不能过牌
+    } else {
+        dom.passBtn.disabled = false;  // 非自由出牌：恢复过牌按钮
     }
 
     if (msg.last_play && msg.last_play.length > 0) {
@@ -328,6 +337,13 @@ window.onTableStatus = function(msg) {
                 }
             }
         }
+        updatePlayers();
+    }
+    // 当前出牌玩家（1-based）→ 高亮座位 + "等待 XX 出牌..." 提示
+    if (msg.current_player) {
+        roomPlayers.forEach(p => { if (p) p.isActive = (p.id === msg.current_player); });
+        const cur = roomPlayers.find(x => x && x.id === msg.current_player);
+        dom.turnHint.textContent = `等待 ${cur ? cur.name : '对方'} 出牌...`;
         updatePlayers();
     }
     // 牌桌显示

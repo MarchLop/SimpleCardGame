@@ -363,3 +363,50 @@ button:active { transform: scale(0.98); }
     .chat-input-row button { width: 100%; }
     #hand-area { padding: 18px 14px calc(env(safe-area-inset-bottom, 14px) + 18px); }
 }
+
+/* ===== 玩家座位卡 ===== */
+.player-pos {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 16px;
+    padding: 12px 14px;
+    transition: border-color .2s, box-shadow .2s, opacity .2s;
+}
+.player-pos .player-name {
+    font-weight: 600;
+    font-size: 15px;
+    min-height: 20px;
+}
+.player-pos .player-info {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 4px;
+    font-size: 13px;
+    color: var(--text-secondary, #9aa4b2);
+}
+.player-played {
+    display: flex;
+    gap: 6px;
+    min-height: 60px;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin: 6px 0;
+}
+.player-played img {
+    height: 58px;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+.player-pos.player-active {
+    border-color: #ffd700;
+    box-shadow: 0 0 0 2px rgba(255,215,0,0.28), 0 8px 24px rgba(0,0,0,0.25);
+}
+.player-pos.player-finished {
+    opacity: 0.45;
+    filter: grayscale(1);
+}
+.player-pos.player-finished .player-name::after {
+    content: " (出完)";
+    color: var(--text-secondary, #9aa4b2);
+}

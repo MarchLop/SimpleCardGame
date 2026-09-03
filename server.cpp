@@ -62,7 +62,7 @@ server ws_server;
 std::string cha="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
 std::vector<std::shared_ptr<Room>> rooms;
-std::unordered_map<std::string,Player> auth_players;
+std::unordered_map<std::string,std::unique_ptr<Player>> auth_players;
 std::map<connection_hdl,Player*, std::owner_less<connection_hdl>> hdl_to_players;
 int next_player_id = 1;
 int next_room_id = 1;
@@ -443,30 +443,30 @@ void on_message(connection_hdl hdl, server::message_ptr msg) {
             std::string token = j.value("token", std::string());
             if(token.empty()){
                 token = romdom_token();
-                auto [it, inserted] = auth_players.emplace(token, Player{hdl, token});
-                hdl_to_players[hdl] = &it->second;
+                auto [it, inserted] = auth_players.emplace(token, std::make_unique<Player>(hdl, token));
+                hdl_to_players[hdl] = it->second.get();
                 json resp;
                 resp["type"] = "auth_ok";
                 resp["token"] = token;
-                resp["name"] = it->second.name;
+                resp["name"] = it->second->name;
                 ws_server.send(hdl, resp.dump(), websocketpp::frame::opcode::text);
             } else {
                 auto it = auth_players.find(token);
                 if(it != auth_players.end()){
-                    it->second.hdl = hdl;
-                    hdl_to_players[hdl] = &it->second;
+                    it->second->hdl = hdl;
+                    hdl_to_players[hdl] = it->second.get();
                     json resp;
                     resp["type"] = "auth_ok";
                     resp["token"] = token;
-                    resp["name"] = it->second.name;
+                    resp["name"] = it->second->name;
                     ws_server.send(hdl, resp.dump(), websocketpp::frame::opcode::text);
                 } else {
-                    auto [it2, inserted] = auth_players.emplace(token, Player{hdl, token});
-                    hdl_to_players[hdl] = &it2->second;
+                    auto [it2, inserted] = auth_players.emplace(token, std::make_unique<Player>(hdl, token));
+                    hdl_to_players[hdl] = it2->second.get();
                     json resp;
                     resp["type"] = "auth_ok";
                     resp["token"] = token;
-                    resp["name"] = it2->second.name;
+                    resp["name"] = it2->second->name;
                     ws_server.send(hdl, resp.dump(), websocketpp::frame::opcode::text);
                 }
             }
