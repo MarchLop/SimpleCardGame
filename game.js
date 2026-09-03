@@ -73,8 +73,12 @@ function updatePlayers() {
 
 // ===== 房间事件 =====
 window.onRoomJoined = function(msg) {
-    dom.statusText.textContent = `等待中 (${msg.player_count}/${msg.max_players})`;
-    dom.readyArea.classList.remove("hidden");
+    if (msg.started) {
+        dom.statusText.textContent = "游戏进行中";   // 已开局重连：不显示准备区，等快照
+    } else {
+        dom.statusText.textContent = `等待中 (${msg.player_count}/${msg.max_players})`;
+        dom.readyArea.classList.remove("hidden");
+    }
     // 初始化座位：player_id 从 1 开始
     // 自己=bottom, 2=right, 3=top, 4=left
     roomPlayers = [null, null, null, null];
@@ -425,7 +429,17 @@ dom.leaveBtn.addEventListener("click", () => {
 window.onError = function(msg) {
     if (msg.code === 1004 || msg.message === "invalid_play") {
         showToast(msg.message || "不合法的牌型", "error");
-    } else {
-        console.warn("server error:", msg.code, msg.message);
+        return;
     }
+    if (msg.code === 302 || msg.code === 306) {
+        showToast("房间已不存在或已开局，返回大厅…", "error");
+        setTimeout(() => { window.location.href = "index.html"; }, 1200);
+        return;
+    }
+    if (msg.code === 304 && msg.room_id) {
+        window.location.href = `game.html?room=${msg.room_id}`;
+        return;
+    }
+    if (msg.code === 303) { showToast("房间已满", "error"); return; }
+    console.warn("server error:", msg.code, msg.message);
 };

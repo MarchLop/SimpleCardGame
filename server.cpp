@@ -424,6 +424,37 @@ void send_game_snapshot(connection_hdl hdl, Room& room, Player* player) {
     ws_server.send(hdl, start_msg.dump(), websocketpp::frame::opcode::text);
 }
 
+// 给单个玩家补发桌面状态（重连恢复用）
+void send_table_status_to(connection_hdl hdl, Room& room) {
+    json last_play = json::array();
+    int last_player = 0;
+    if(room.game.card_in_table.first != CardsType::INVALID){
+        for(const auto &card : room.game.card_in_table.second)
+            last_play.push_back({{"num", card.num}, {"suit", card.suit}});
+        last_player = room.last_player;
+    }
+    json msgb{
+        {"type","table_status"},{"room_id", room.id},
+        {"player_status", json::array()},
+        {"last_play", last_play},{"last_player", last_player},
+        {"is_free", is_free_turn(room)}
+    };
+    int now = 0;
+    for(auto p : room.players){
+        auto gp_it = room.player_map.find(p);
+        int hand_size = 0; bool is_over = false;
+        if(gp_it != room.player_map.end() && gp_it->second){
+            hand_size = (int)gp_it->second->GetHand().size();
+            is_over = gp_it->second->over;
+        }
+        msgb["player_status"].push_back({
+            {"player_id", ++now},{"playerhand_size", hand_size},
+            {"player_public_identity", p->public_identity},{"is_over", is_over}
+        });
+    }
+    ws_server.send(hdl, msgb.dump(), websocketpp::frame::opcode::text);
+}
+
 void on_message(connection_hdl hdl, server::message_ptr msg) {
     json j;
     try {
@@ -489,7 +520,11 @@ void on_message(connection_hdl hdl, server::message_ptr msg) {
             
             if(itp == hdl_to_players.end()){send_error(hdl,201,"not_authed");break;}
 
-            if(find_room_by_player(itp->second)){send_error(hdl,304,"already_in_room");break;}
+            if(find_room_by_player(itp->second)){
+                json err{{{"type","error"},{"code",304},{"message","already_in_room"},{"room_id",find_room_by_player(itp->second)->id}}};
+                ws_server.send(hdl, err.dump(), websocketpp::frame::opcode::text);
+                break;
+            }
 
             if((int)rooms.size() >= 10){send_error(hdl,202,"max_rooms");break;}
 
@@ -529,12 +564,20 @@ void on_message(connection_hdl hdl, server::message_ptr msg) {
             auto existing = find_room_by_player(player);
             if(existing){
                 if(existing->id != roomid){
-                    send_error(hdl,304,"already_in_room");
+                    json err{{{"type","error"},{"code",304},{"message","already_in_room"},{"room_id",existing->id}}};
+                    ws_server.send(hdl, err.dump(), websocketpp::frame::opcode::text);
                     break;
                 }
                 send_room_joined(hdl, room, player);
                 send_player_list(hdl, room);
-                if(room.started) send_game_snapshot(hdl, room, player);
+                if(room.started){
+                    send_game_snapshot(hdl, room, player);
+                    sync_current_turn(room_ptr);
+                    if(!room.players.empty() && room.players[room.current_turn] == player)
+                        send_your_turn(room_ptr);          // 正轮到他：补发 your_turn（内部会广播 table_status）
+                    else
+                        send_table_status_to(hdl, room);   // 否则补发桌面状态让他看到局面
+                }
                 break;
             }
             if(room.started){send_error(hdl,306,"game_already_started");break;}

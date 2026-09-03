@@ -81,5 +81,18 @@ window.onRoomJoined = function(msg) {
     window.location.href = `game.html?room=${msg.room_id}`;
 };
 
+window.onError = function(msg) {
+    if (msg.code === 304) {
+        if (msg.room_id) {
+            window.location.href = `game.html?room=${msg.room_id}`;
+        } else {
+            alert("你仍在某个房间中，请先进入该房间退出后再操作");
+        }
+        return;
+    }
+    if (msg.code === 202) { alert("房间数已达上限(10)"); return; }
+    console.warn("lobby error:", msg.code, msg.message);
+};
+
 setInterval(refreshRooms, 5000);
 
